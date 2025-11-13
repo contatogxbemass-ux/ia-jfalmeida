@@ -21,10 +21,18 @@ const ZAPI_CLIENT_TOKEN = process.env.ZAPI_CLIENT_TOKEN;
 const OPENAI_KEY = process.env.OPENAI_KEY;
 
 // ===============================================
+// 🔥 ADMINS (NÚMEROS QUE PODEM CONTROLAR OUTROS)
+// ===============================================
+const ADMINS = [
+  "5511942063985",        // você
+  // "55OUTRO_NUMERO_AQUI" // corretores / sua mãe / etc.
+];
+
+// ===============================================
 // 🔥 ESTADO DOS USUÁRIOS
 // ===============================================
 // estados[telefone] = {
-//   etapa: "menu" | "compra_tipo" | ... | "aguardando_corretor",
+//   etapa: "menu" | ... | "aguardando_corretor",
 //   dados: { ... },
 //   lastMessageId: string | null,
 //   silencio: boolean
@@ -44,9 +52,6 @@ app.get("/", (req, res) => {
 app.post("/webhook", async (req, res) => {
   console.log("📩 RECEBIDO DO Z-API:", JSON.stringify(req.body, null, 2));
 
-  // Z-API manda assim:
-  // phone: '55119XXXXXXX'
-  // text: { message: 'oi' }
   const telefone = req.body.phone || req.body.connectedPhone;
   const texto =
     (req.body.text && req.body.text.message && String(req.body.text.message)) ||
@@ -65,7 +70,7 @@ app.post("/webhook", async (req, res) => {
       etapa: "menu",
       dados: {},
       lastMessageId: null,
-      silencio: false,        // 👈 NOVO: modo silencioso
+      silencio: false,
     };
   }
 
@@ -80,42 +85,107 @@ app.post("/webhook", async (req, res) => {
 
   const msg = texto.trim();
   const msgLower = msg.toLowerCase();
+  const partes = msgLower.split(" ").filter(Boolean);
 
   // ====================================================
-  // 📴 COMANDOS GLOBAIS: /pausar e /voltar
-  // (não mexem na lógica antiga, só travam/reativam tudo)
+  // 📴 COMANDOS GLOBAIS: /pausar E /voltar
   // ====================================================
 
-  // Colocar o bot em modo silencioso para ESSA conversa
-  if (msgLower === "/pausar") {
-    estado.silencio = true;
-    console.log("🤫 MODO SILENCIOSO ATIVADO PARA:", telefone);
+  // /pausar  -> pausa a conversa atual
+  // /pausar 55119xxxxxxx -> ADMIN pausa esse número
+  if (partes[0] === "/pausar") {
+    if (partes.length === 1) {
+      // pausa a conversa atual
+      estado.silencio = true;
+      console.log("🤫 MODO SILENCIOSO ATIVADO PARA:", telefone);
 
-    await enviarMensagemWhatsApp(
-      telefone,
-      "🤫 Atendimento automático pausado para esta conversa.\nAgora apenas um corretor humano irá responder."
-    );
+      await enviarMensagemWhatsApp(
+        telefone,
+        "🤫 Atendimento automático pausado para esta conversa.\nAgora apenas um corretor humano irá responder."
+      );
 
-    return res.sendStatus(200);
+      return res.sendStatus(200);
+    }
+
+    if (partes.length >= 2 && ADMINS.includes(telefone)) {
+      const alvo = partes[1];
+
+      if (!estados[alvo]) {
+        estados[alvo] = {
+          etapa: "aguardando_corretor",
+          dados: {},
+          lastMessageId: null,
+          silencio: true,
+        };
+      } else {
+        estados[alvo].silencio = true;
+      }
+
+      console.log(`🤫 ADMIN ${telefone} PAUSOU O NÚMERO: ${alvo}`);
+
+      await enviarMensagemWhatsApp(
+        telefone,
+        `🤫 Atendimento automático pausado para o número: ${alvo}.`
+      );
+
+      return res.sendStatus(200);
+    }
+
+    if (partes.length >= 2 && !ADMINS.includes(telefone)) {
+      return res.sendStatus(200);
+    }
   }
 
-  // Tirar do modo silencioso e voltar pro menu
-  if (msgLower === "/voltar") {
-    estado.silencio = false;
-    estado.etapa = "menu";
-    estado.dados = {};
-    console.log("🔊 MODO SILENCIOSO DESATIVADO PARA:", telefone);
+  // /voltar -> volta o bot na conversa atual
+  // /voltar 55119xxxxxxx -> ADMIN volta o bot pra esse número
+  if (partes[0] === "/voltar") {
+    if (partes.length === 1) {
+      estado.silencio = false;
+      estado.etapa = "menu";
+      estado.dados = {};
 
-    await enviarMensagemWhatsApp(
-      telefone,
-      "🔊 Atendimento automático reativado. Vou te mostrar o menu novamente:"
-    );
-    await enviarMensagemWhatsApp(telefone, menuPrincipal());
+      console.log("🔊 MODO SILENCIOSO DESATIVADO PARA:", telefone);
 
-    return res.sendStatus(200);
+      await enviarMensagemWhatsApp(
+        telefone,
+        "🔊 Atendimento automático reativado. Vou te mostrar o menu novamente:"
+      );
+      await enviarMensagemWhatsApp(telefone, menuPrincipal());
+
+      return res.sendStatus(200);
+    }
+
+    if (partes.length >= 2 && ADMINS.includes(telefone)) {
+      const alvo = partes[1];
+
+      if (!estados[alvo]) {
+        estados[alvo] = {
+          etapa: "menu",
+          dados: {},
+          lastMessageId: null,
+          silencio: false,
+        };
+      } else {
+        estados[alvo].silencio = false;
+        estados[alvo].etapa = "menu";
+      }
+
+      console.log(`🔊 ADMIN ${telefone} REATIVOU O NÚMERO: ${alvo}`);
+
+      await enviarMensagemWhatsApp(
+        telefone,
+        `🔊 Atendimento automático reativado para o número: ${alvo}.`
+      );
+
+      return res.sendStatus(200);
+    }
+
+    if (partes.length >= 2 && !ADMINS.includes(telefone)) {
+      return res.sendStatus(200);
+    }
   }
 
-  // Se estiver em modo silencioso → NADA responde
+  // Se estiver em modo silencioso → não responde nada
   if (estado.silencio) {
     console.log("🤫 Cliente em modo silencioso, bot não responde.");
     return res.sendStatus(200);
@@ -140,7 +210,7 @@ app.post("/webhook", async (req, res) => {
   // ====================================================
   if (estado.etapa === "menu") {
     switch (msg) {
-      case "1":
+      case "1": // Comprar
         estado.etapa = "compra_tipo";
         estado.dados = {};
         await enviarMensagemWhatsApp(
@@ -151,7 +221,29 @@ app.post("/webhook", async (req, res) => {
         );
         return res.sendStatus(200);
 
-      case "2":
+      case "2": // Alugar
+        estado.etapa = "alug_cliente_tipo";
+        estado.dados = {};
+        await enviarMensagemWhatsApp(
+          telefone,
+          "Ótimo! Vamos te ajudar a alugar um imóvel. 🏠\n\n" +
+            "👉 *Primeiro:* qual *tipo de imóvel* você quer alugar?\n" +
+            "(Casa, apartamento, studio, kitnet, etc.)"
+        );
+        return res.sendStatus(200);
+
+      case "3": // Ver imóveis disponíveis
+        estado.etapa = "list_tipo";
+        estado.dados = {};
+        await enviarMensagemWhatsApp(
+          telefone,
+          "Beleza, vou separar opções para você. 🔎\n\n" +
+            "👉 *Primeiro:* qual *tipo de imóvel* você quer ver?\n" +
+            "(Casa, apartamento, studio, etc.)"
+        );
+        return res.sendStatus(200);
+
+      case "4": // Vender
         estado.etapa = "venda_tipo";
         estado.dados = {};
         await enviarMensagemWhatsApp(
@@ -162,7 +254,18 @@ app.post("/webhook", async (req, res) => {
         );
         return res.sendStatus(200);
 
-      case "3":
+      case "5": // Colocar imóvel para aluguel
+        estado.etapa = "alug_prop_tipo";
+        estado.dados = {};
+        await enviarMensagemWhatsApp(
+          telefone,
+          "Perfeito! Vamos te ajudar a colocar seu imóvel para aluguel. 🏠\n\n" +
+            "👉 *Primeiro:* qual é o *tipo de imóvel*?\n" +
+            "(Casa, apartamento, kitnet, sala comercial, etc.)"
+        );
+        return res.sendStatus(200);
+
+      case "6": // Financiamentos
         estado.etapa = "fin_renda";
         estado.dados = {};
         await enviarMensagemWhatsApp(
@@ -172,18 +275,7 @@ app.post("/webhook", async (req, res) => {
         );
         return res.sendStatus(200);
 
-      case "4":
-        estado.etapa = "list_tipo";
-        estado.dados = {};
-        await enviarMensagemWhatsApp(
-          telefone,
-          "Beleza, vou te mostrar opções de imóveis. 🔎\n\n" +
-            "👉 *Primeiro:* qual *tipo de imóvel* você quer ver?\n" +
-            "(Casa, apartamento, studio, etc.)"
-        );
-        return res.sendStatus(200);
-
-      case "0":
+      case "0": // Corretor humano
         estado.etapa = "aguardando_corretor";
         estado.dados = {};
         await enviarMensagemWhatsApp(
@@ -192,7 +284,7 @@ app.post("/webhook", async (req, res) => {
             "Pra agilizar, me manda:\n" +
             "• Seu *nome completo*\n" +
             "• Melhor *horário pra contato*\n" +
-            "• Assunto (compra, venda, financiamento…)\n\n" +
+            "• Assunto (compra, venda, aluguel, financiamento…)\n\n" +
             "Um corretor da *JF Almeida* vai te chamar aqui em instantes. 🙂"
         );
         return res.sendStatus(200);
@@ -263,7 +355,6 @@ app.post("/webhook", async (req, res) => {
   if (estado.etapa === "compra_urgencia") {
     estado.dados.urgencia = msg;
 
-    // Gera resumo e encerra fluxo
     const resumo = await gerarResumoIA("compra_imovel", estado.dados, telefone);
 
     await enviarMensagemWhatsApp(telefone, resumo);
@@ -492,6 +583,170 @@ app.post("/webhook", async (req, res) => {
     return res.sendStatus(200);
   }
 
+  // ====================================================
+  // 🏠 FLUXO ALUGAR (CLIENTE) – pergunta por pergunta
+  // ====================================================
+  if (estado.etapa === "alug_cliente_tipo") {
+    estado.dados.tipo = msg;
+    estado.etapa = "alug_cliente_regiao";
+
+    await enviarMensagemWhatsApp(
+      telefone,
+      "Perfeito! 📍\n\n" +
+        "👉 Em qual *bairro ou região* você gostaria de alugar o imóvel?"
+    );
+    return res.sendStatus(200);
+  }
+
+  if (estado.etapa === "alug_cliente_regiao") {
+    estado.dados.regiao = msg;
+    estado.etapa = "alug_cliente_orcamento";
+
+    await enviarMensagemWhatsApp(
+      telefone,
+      "Show! 💸\n\n" +
+        "👉 Qual é o seu *orçamento máximo de aluguel* por mês?"
+    );
+    return res.sendStatus(200);
+  }
+
+  if (estado.etapa === "alug_cliente_orcamento") {
+    estado.dados.orcamento = msg;
+    estado.etapa = "alug_cliente_quartos";
+
+    await enviarMensagemWhatsApp(
+      telefone,
+      "Entendi. 🛏️\n\n" +
+        "👉 Quantos *quartos* você precisa?"
+    );
+    return res.sendStatus(200);
+  }
+
+  if (estado.etapa === "alug_cliente_quartos") {
+    estado.dados.quartos = msg;
+    estado.etapa = "alug_cliente_data";
+
+    await enviarMensagemWhatsApp(
+      telefone,
+      "Perfeito. 📅\n\n" +
+        "👉 Você pretende se mudar *quando* aproximadamente?"
+    );
+    return res.sendStatus(200);
+  }
+
+  if (estado.etapa === "alug_cliente_data") {
+    estado.dados.dataMudanca = msg;
+    estado.etapa = "alug_cliente_finalidade";
+
+    await enviarMensagemWhatsApp(
+      telefone,
+      "Show!\n\n" +
+        "👉 A finalidade do aluguel é para *moradia* ou *trabalho/empresa*?"
+    );
+    return res.sendStatus(200);
+  }
+
+  if (estado.etapa === "alug_cliente_finalidade") {
+    estado.dados.finalidade = msg;
+
+    const resumo = await gerarResumoIA("aluguel_imovel", estado.dados, telefone);
+
+    await enviarMensagemWhatsApp(telefone, resumo);
+
+    await enviarMensagemWhatsApp(
+      telefone,
+      "Top! 🙌\n" +
+        "Já encaminhei seu perfil de aluguel para um corretor da *JF Almeida*.\n" +
+        "Ele vai te chamar aqui com opções que encaixam no que você procura. 🏠"
+    );
+
+    estado.etapa = "aguardando_corretor";
+    return res.sendStatus(200);
+  }
+
+  // ====================================================
+  // 🏠 FLUXO ALUGAR (PROPRIETÁRIO) – colocar imóvel para aluguel
+  // ====================================================
+  if (estado.etapa === "alug_prop_tipo") {
+    estado.dados.tipo = msg;
+    estado.etapa = "alug_prop_endereco";
+
+    await enviarMensagemWhatsApp(
+      telefone,
+      "Perfeito! 📍\n\n" +
+        "👉 Em qual *bairro/cidade* o imóvel está localizado?"
+    );
+    return res.sendStatus(200);
+  }
+
+  if (estado.etapa === "alug_prop_endereco") {
+    estado.dados.endereco = msg;
+    estado.etapa = "alug_prop_quartos";
+
+    await enviarMensagemWhatsApp(
+      telefone,
+      "Show! 🛏️\n\n" +
+        "👉 Quantos *quartos* o imóvel possui?"
+    );
+    return res.sendStatus(200);
+  }
+
+  if (estado.etapa === "alug_prop_quartos") {
+    estado.dados.quartos = msg;
+    estado.etapa = "alug_prop_estado";
+
+    await enviarMensagemWhatsApp(
+      telefone,
+      "Entendido. 🔧\n\n" +
+        "👉 Como está o *estado de conservação* do imóvel?\n" +
+        "(Novo, reformado, bom estado, precisa de reforma, etc.)"
+    );
+    return res.sendStatus(200);
+  }
+
+  if (estado.etapa === "alug_prop_estado") {
+    estado.dados.estado = msg;
+    estado.etapa = "alug_prop_valor";
+
+    await enviarMensagemWhatsApp(
+      telefone,
+      "Perfeito. 💰\n\n" +
+        "👉 Qual é o *valor de aluguel* que você deseja receber por mês?"
+    );
+    return res.sendStatus(200);
+  }
+
+  if (estado.etapa === "alug_prop_valor") {
+    estado.dados.valor = msg;
+    estado.etapa = "alug_prop_garantia";
+
+    await enviarMensagemWhatsApp(
+      telefone,
+      "Show!\n\n" +
+        "👉 Você aceita qual tipo de *garantia*?\n" +
+        "(Fiador, seguro fiança, caução/depósito, não sei ainda, etc.)"
+    );
+    return res.sendStatus(200);
+  }
+
+  if (estado.etapa === "alug_prop_garantia") {
+    estado.dados.garantia = msg;
+
+    const resumo = await gerarResumoIA("aluguel_proprietario", estado.dados, telefone);
+
+    await enviarMensagemWhatsApp(telefone, resumo);
+
+    await enviarMensagemWhatsApp(
+      telefone,
+      "Perfeito! 🙌\n" +
+        "Já encaminhei seus dados para um corretor da *JF Almeida* responsável por locação.\n" +
+        "Ele vai te chamar aqui para seguir com o processo. 🏠"
+    );
+
+    estado.etapa = "aguardando_corretor";
+    return res.sendStatus(200);
+  }
+
   // Se caiu aqui, só responde com menu de segurança
   await enviarMensagemWhatsApp(
     telefone,
@@ -505,16 +760,21 @@ app.post("/webhook", async (req, res) => {
 });
 
 // ===============================================
-// 🔥 MENU PRINCIPAL (texto)
+// 🔥 MENU PRINCIPAL (texto) – MODELO B
 // ===============================================
 function menuPrincipal() {
   return (
     "👋 *Bem-vindo(a) à JF Almeida Imóveis!*\n\n" +
-    "Digite o número da opção desejada:\n\n" +
+    "🏡 *IMÓVEIS PARA VOCÊ*\n" +
     "1️⃣ Quero *comprar* um imóvel\n" +
-    "2️⃣ Quero *vender* meu imóvel\n" +
-    "3️⃣ Quero saber sobre *financiamentos*\n" +
-    "4️⃣ Ver *imóveis disponíveis*\n" +
+    "2️⃣ Quero *alugar* um imóvel\n" +
+    "3️⃣ Ver *imóveis disponíveis*\n\n" +
+    "🏠 *SOU PROPRIETÁRIO*\n" +
+    "4️⃣ Quero *vender* um imóvel\n" +
+    "5️⃣ Quero *colocar meu imóvel para aluguel*\n\n" +
+    "💰 *FINANCEIRO*\n" +
+    "6️⃣ Saber sobre *financiamentos*\n\n" +
+    "👤 *ATENDIMENTO HUMANO*\n" +
     "0️⃣ Falar com um *corretor humano*\n\n" +
     "Você pode digitar *menu* a qualquer momento pra voltar aqui. 😉"
   );
