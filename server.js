@@ -8,40 +8,37 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ===============================================
-// 🔥 CONFIG Z-API
+// 🔥 Z-API CONFIG
 // ===============================================
 const ZAPI_NUMBER = process.env.ZAPI_NUMBER;
 const ZAPI_TOKEN = process.env.ZAPI_TOKEN;
 const ZAPI_CLIENT_TOKEN = process.env.ZAPI_CLIENT_TOKEN;
 
 // ===============================================
-// 🔥 CONFIG OPENAI
+// 🔥 OPENAI CONFIG
 // ===============================================
 const OPENAI_KEY = process.env.OPENAI_KEY;
 
 // ===============================================
 // 🔥 ADMINS AUTORIZADOS
-// COLOQUE SEUS NÚMEROS SEM +, SEM ESPAÇO
-// EXEMPLO: 5511999998888
 // ===============================================
 const ADMINS = [
-    "5511913306305",
+    "5511913306305"
 ];
 
 // ===============================================
-// 🔥 ESTADO GLOBAL DOS USUÁRIOS
+// 🔥 ESTADO DO USUÁRIO
 // ===============================================
 const estados = {};
-// estados[telefone] = { stage, lastMessage, silencio, campos... }
+// estados[telefone] = { stage, lastMessage, silencio }
 
 // ===============================================
-// 🔥 WEBHOOK PRINCIPAL
+// 🔥 WEBHOOK
 // ===============================================
 app.post("/webhook", async (req, res) => {
 
     console.log("📩 RECEBIDO:", req.body);
 
-    // captura msg independente do formato da Z-API
     const msg =
         req.body?.text?.message ||
         req.body?.message ||
@@ -52,12 +49,12 @@ app.post("/webhook", async (req, res) => {
 
     if (!telefone || !msg) return res.sendStatus(200);
 
-    // cria estado inicial
+    // criar estado inicial
     if (!estados[telefone]) {
         estados[telefone] = {
             stage: "menu",
             lastMessage: null,
-            silencio: false,
+            silencio: false
         };
     }
 
@@ -65,45 +62,38 @@ app.post("/webhook", async (req, res) => {
     const txt = msg.trim().toLowerCase();
 
     // ===============================================
-    // 🔥 CONTROLES DE ADMIN (/pausar e /voltar)
+    // 🔥 COMANDOS DE ADMIN (/pausar /voltar)
     // ===============================================
-
     if (ADMINS.includes(telefone)) {
 
         if (txt === "/pausar") {
             estado.silencio = true;
             console.log("🤫 BOT PAUSADO PARA:", telefone);
-            await enviarMensagemWhatsApp(
-                telefone,
-                "🤫 Bot pausado para este cliente. Agora apenas atendimento humano responderá."
-            );
+            await enviarMensagemWhatsApp(telefone, "🤫 Bot pausado para este cliente.");
             return res.sendStatus(200);
         }
 
         if (txt === "/voltar") {
             estado.silencio = false;
             estado.stage = "menu";
-            console.log("🔊 BOT REATIVADO PARA:", telefone);
-            await enviarMensagemWhatsApp(
-                telefone,
-                "🔊 Bot reativado! Voltando ao menu principal."
-            );
+            console.log("🔊 BOT VOLTOU PARA:", telefone);
+            await enviarMensagemWhatsApp(telefone, "🔊 Bot reativado! Aqui está o menu:");
             await enviarMensagemWhatsApp(telefone, menuPrincipal());
             return res.sendStatus(200);
         }
     }
 
-    // se cliente está em modo silencioso → bot ignora
+    // cliente está pausado → não responder
     if (estado.silencio) {
-        console.log("🤫 MODO SILENCIOSO ATIVO — mensagem ignorada.");
+        console.log("🛑 Ignorado (modo silencioso):", telefone);
         return res.sendStatus(200);
     }
 
-    // anti-spam ZAPI
+    // anti-spam
     if (estado.lastMessage === msg) return res.sendStatus(200);
     estado.lastMessage = msg;
 
-    // comando global
+    // comando global de menu
     if (txt === "menu") {
         estado.stage = "menu";
         await enviarMensagemWhatsApp(telefone, menuPrincipal());
@@ -116,91 +106,88 @@ app.post("/webhook", async (req, res) => {
     if (estado.stage === "menu") {
 
         if (msg === "1") {
-            estado.stage = "compra_tipo";
+            estado.stage = "fluxo_compra";
             return enviarMensagemWhatsApp(
                 telefone,
-                "Perfeito! Vamos iniciar sua busca.\n\n👉 Qual *tipo de imóvel* você procura?"
-            );
+                "Perfeito! Me envie TUDO em uma única mensagem:\n\n" +
+                "1️⃣ Tipo do imóvel\n" +
+                "2️⃣ Bairro desejado\n" +
+                "3️⃣ Orçamento máximo\n" +
+                "4️⃣ Forma de pagamento\n" +
+                "5️⃣ Urgência"
+            ).then(() => res.sendStatus(200));
         }
 
         if (msg === "2") {
-            estado.stage = "venda_tipo";
+            estado.stage = "fluxo_venda";
             return enviarMensagemWhatsApp(
                 telefone,
-                "Ótimo! Vamos avaliar seu imóvel.\n\n👉 Qual é o *tipo do imóvel*?"
-            );
+                "Ótimo! Envie em UMA mensagem:\n\n" +
+                "1️⃣ Tipo do imóvel\n" +
+                "2️⃣ Localização\n" +
+                "3️⃣ Quartos\n" +
+                "4️⃣ Estado de conservação\n" +
+                "5️⃣ Valor desejado"
+            ).then(() => res.sendStatus(200));
         }
 
         if (msg === "3") {
-            estado.stage = "fin_renda";
+            estado.stage = "fluxo_financiamento";
             return enviarMensagemWhatsApp(
                 telefone,
-                "Vamos analisar seu financiamento.\n\n👉 Qual é sua *renda mensal*?"
-            );
+                "Vamos sim! Envie:\n\n" +
+                "1️⃣ Renda mensal\n" +
+                "2️⃣ Entrada disponível\n" +
+                "3️⃣ Tipo do imóvel\n" +
+                "4️⃣ Cidade\n" +
+                "5️⃣ Tipo de financiamento"
+            ).then(() => res.sendStatus(200));
         }
 
         if (msg === "4") {
-            estado.stage = "list_tipo";
+            estado.stage = "fluxo_listagem";
             return enviarMensagemWhatsApp(
                 telefone,
-                "Vamos listar imóveis.\n\n👉 Qual *tipo de imóvel* você deseja?"
-            );
+                "Claro! Envie:\n\n" +
+                "1️⃣ Tipo de imóvel\n" +
+                "2️⃣ Região\n" +
+                "3️⃣ Preço máximo\n" +
+                "4️⃣ Quartos\n" +
+                "5️⃣ Finalidade"
+            ).then(() => res.sendStatus(200));
         }
 
         if (msg === "0") {
             estado.stage = "aguardando_corretor";
             return enviarMensagemWhatsApp(
                 telefone,
-                "📞 Claro! Encaminhando para um corretor...\n\nEnvie:\n• Nome completo\n• Melhor horário\n• Assunto"
-            );
+                "📞 Vou te conectar com um corretor agora.\nEnvie:\n• Nome completo\n• Melhor horário\n• Assunto"
+            ).then(() => res.sendStatus(200));
         }
 
-        return enviarMensagemWhatsApp(telefone, menuPrincipal());
+        await enviarMensagemWhatsApp(telefone, menuPrincipal());
+        return res.sendStatus(200);
     }
 
     // ===============================================
-    // 🔥 FLUXO — COMPRA (pergunta por pergunta)
+    // 🔥 FLUXOS — APÓS RESPOSTA FINAL
     // ===============================================
-    if (estado.stage === "compra_tipo") {
-        estado.tipo = msg;
-        estado.stage = "compra_regiao";
-        return enviarMensagemWhatsApp(telefone, "👉 Qual *bairro/região* deseja?");
-    }
-
-    if (estado.stage === "compra_regiao") {
-        estado.regiao = msg;
-        estado.stage = "compra_preco";
-        return enviarMensagemWhatsApp(telefone, "👉 Qual seu *orçamento máximo*?");
-    }
-
-    if (estado.stage === "compra_preco") {
-        estado.preco = msg;
-        estado.stage = "compra_pagamento";
-        return enviarMensagemWhatsApp(telefone, "👉 Forma de pagamento? (à vista / financiado)");
-    }
-
-    if (estado.stage === "compra_pagamento") {
-        estado.pagamento = msg;
-        estado.stage = "compra_urgencia";
-        return enviarMensagemWhatsApp(telefone, "👉 Nível de urgência? (baixa / média / alta)");
-    }
-
-    if (estado.stage === "compra_urgencia") {
-        estado.urgencia = msg;
-        estado.stage = "aguardando_corretor";
-
-        const resumo = `
-📋 *Resumo da Solicitação de Compra*
-
-• Tipo: ${estado.tipo}
-• Região: ${estado.regiao}
-• Orçamento: ${estado.preco}
-• Pagamento: ${estado.pagamento}
-• Urgência: ${estado.urgencia}
-
-🔎 Um corretor da JF Almeida vai te chamar em instantes. 🙂`;
+    if (
+        estado.stage === "fluxo_compra" ||
+        estado.stage === "fluxo_venda" ||
+        estado.stage === "fluxo_financiamento" ||
+        estado.stage === "fluxo_listagem"
+    ) {
+        const resumo = await gerarResumoIA(estado.stage, msg);
 
         await enviarMensagemWhatsApp(telefone, resumo);
+
+        await enviarMensagemWhatsApp(
+            telefone,
+            "Perfeito! Já encaminhei suas informações para um corretor da JF Almeida.\nEle irá te chamar em instantes. 🙂"
+        );
+
+        estado.stage = "aguardando_corretor";
         return res.sendStatus(200);
     }
 
@@ -208,21 +195,57 @@ app.post("/webhook", async (req, res) => {
 });
 
 // ===============================================
-// 🔥 MENU PRINCIPAL
+// 🔥 MENU
 // ===============================================
 function menuPrincipal() {
     return (
         "👋 *Bem-vindo(a) à JF Almeida Imóveis!*\n\n" +
-        "1️⃣ Quero comprar um imóvel\n" +
-        "2️⃣ Quero vender meu imóvel\n" +
-        "3️⃣ Saber sobre financiamentos\n" +
-        "4️⃣ Ver imóveis disponíveis\n" +
-        "0️⃣ Falar com um corretor"
+        "1️⃣ Comprar imóvel\n" +
+        "2️⃣ Vender imóvel\n" +
+        "3️⃣ Financiamento\n" +
+        "4️⃣ Ver imóveis\n" +
+        "0️⃣ Falar com corretor"
     );
 }
 
 // ===============================================
-// 🔥 ENVIO DE MENSAGEM Z-API
+// 🔥 IA RESUMO
+// ===============================================
+async function gerarResumoIA(fluxo, msg) {
+    const prompt = `
+Organize profissionalmente as informações do cliente.
+Fluxo: ${fluxo}
+Respostas: ${msg}
+    `;
+
+    try {
+        const r = await axios.post(
+            "https://api.openai.com/v1/chat/completions",
+            {
+                model: "gpt-4o-mini",
+                messages: [
+                    { role: "system", content: "Você é um atendente profissional da JF Almeida Imóveis." },
+                    { role: "user", content: prompt }
+                ]
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${OPENAI_KEY}`,
+                    "Content-Type": "application/json"
+                }
+            }
+        );
+
+        return r.data.choices[0].message.content;
+
+    } catch (e) {
+        console.log("ERRO IA:", e.response?.data || e.message);
+        return "Recebemos suas informações. Obrigado!";
+    }
+}
+
+// ===============================================
+// 🔥 ENVIO Z-API
 // ===============================================
 async function enviarMensagemWhatsApp(telefone, texto) {
     try {
@@ -232,7 +255,7 @@ async function enviarMensagemWhatsApp(telefone, texto) {
             { headers: { "Client-Token": ZAPI_CLIENT_TOKEN } }
         );
     } catch (e) {
-        console.log("ERRO ENVIO:", e.response?.data || e.message);
+        console.log("ERRO AO ENVIAR:", e.response?.data || e.message);
     }
 }
 
@@ -240,6 +263,6 @@ async function enviarMensagemWhatsApp(telefone, texto) {
 // 🔥 SERVIDOR
 // ===============================================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () =>
-    console.log("🔥 Servidor rodando na porta " + PORT)
-);
+app.listen(PORT, () => {
+    console.log("🔥 Servidor rodando na porta " + PORT);
+});
