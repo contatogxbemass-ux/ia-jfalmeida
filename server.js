@@ -1,14 +1,9 @@
-// ===============================================
-// 🔥 DEPENDÊNCIAS
-// ===============================================
 const express = require("express");
 const axios = require("axios");
 require("dotenv").config();
 
-// ===============================================
-// 🔥 APP
-// ===============================================
 const app = express();
+
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
@@ -27,51 +22,43 @@ const OPENAI_KEY = process.env.OPENAI_KEY;
 // ===============================================
 // 🔥 ESTADOS DOS USUÁRIOS
 // ===============================================
-const estados = {};
-
+const estados = {}; 
+// estados[telefone] = { stage: "...", lastMessage: "..." }
 
 // ===============================================
-// 🔥 WEBHOOK — este é o coração do bot
+// 🔥 WEBHOOK
 // ===============================================
 app.post("/webhook", async (req, res) => {
     console.log("📩 RECEBIDO DO Z-API:", req.body);
 
-    // 🟢 Ajuste FINAL → Captura do formato REAL da Z-API
-    const msg =
-        req.body?.text?.message ||   // onde a Z-API envia mensagem
-        req.body?.message ||         // fallback
-        null;
+    const telefone = req.body.phone;
+    const msg = req.body.text?.message; // <<<<<<  ESSA É A CORREÇÃO PRINCIPAL
 
-    const telefone =
-        req.body?.connectedPhone ||  // onde a Z-API envia telefone
-        req.body?.phone ||           // fallback
-        null;
-
-    if (!telefone || !msg) {
-        console.log("⚠️ Ignorado: mensagem sem telefone ou sem conteúdo");
+    if (!telefone || !msg || msg.trim() === "") {
+        console.log("⚠️ Ignorado: mensagem sem telefone ou conteúdo");
         return res.sendStatus(200);
     }
 
-    // 🟢 Inicializa estado do usuário
+    // Inicia estado se primeira mensagem
     if (!estados[telefone]) {
         estados[telefone] = { stage: "menu", lastMessage: null };
     }
 
     const estado = estados[telefone];
 
-    // 🟡 Anti-spam: evita mensagens duplicadas da Z-API
+    // Anti-spam
     if (estado.lastMessage === msg) return res.sendStatus(200);
     estado.lastMessage = msg;
 
     const txt = msg.trim().toLowerCase();
 
-    // 🟣 Se já escolheu falar com corretor → bot não responde mais
+    // Cliente já está com corretor humano
     if (estado.stage === "aguardando_corretor") {
-        console.log("👤 Cliente aguardando corretor, bot pausado.");
+        console.log("👤 Cliente aguardando corretor, bot não responde.");
         return res.sendStatus(200);
     }
 
-    // 🔵 Comando global
+    // Comando global MENU
     if (txt === "menu") {
         estado.stage = "menu";
         await enviarMensagemWhatsApp(telefone, menuPrincipal());
@@ -82,24 +69,25 @@ app.post("/webhook", async (req, res) => {
     // 🔥 MENU PRINCIPAL
     // ===============================================
     if (estado.stage === "menu") {
-        if (txt === "1") {
+
+        if (msg === "1") {
             estado.stage = "fluxo_compra";
             return enviarMensagemWhatsApp(
                 telefone,
-                "Perfeito! Para encontrar o imóvel ideal, envie tudo em **uma única mensagem**:\n\n" +
+                "Perfeito! Envie **tudo em uma única mensagem**:\n\n" +
                 "1️⃣ Tipo do imóvel\n" +
-                "2️⃣ Bairro/região\n" +
+                "2️⃣ Região desejada\n" +
                 "3️⃣ Orçamento máximo\n" +
-                "4️⃣ Pagamento (financiado / à vista)\n" +
+                "4️⃣ Tipo de pagamento\n" +
                 "5️⃣ Urgência"
             ).then(() => res.sendStatus(200));
         }
 
-        if (txt === "2") {
+        if (msg === "2") {
             estado.stage = "fluxo_venda";
             return enviarMensagemWhatsApp(
                 telefone,
-                "Ótimo! Para ajudar na venda, envie tudo em **uma única mensagem**:\n\n" +
+                "Ótimo! Envie **tudo em uma única mensagem**:\n\n" +
                 "1️⃣ Tipo do imóvel\n" +
                 "2️⃣ Localização\n" +
                 "3️⃣ Quartos / tamanho\n" +
@@ -108,12 +96,12 @@ app.post("/webhook", async (req, res) => {
             ).then(() => res.sendStatus(200));
         }
 
-        if (txt === "3") {
+        if (msg === "3") {
             estado.stage = "fluxo_financiamento";
             return enviarMensagemWhatsApp(
                 telefone,
-                "Certo! Para analisar o financiamento, envie tudo em **uma única mensagem**:\n\n" +
-                "1️⃣ Renda mensal\n" +
+                "Envie **tudo em uma única mensagem**:\n\n" +
+                "1️⃣ Sua renda mensal\n" +
                 "2️⃣ Entrada disponível\n" +
                 "3️⃣ Tipo do imóvel\n" +
                 "4️⃣ Cidade\n" +
@@ -121,49 +109,53 @@ app.post("/webhook", async (req, res) => {
             ).then(() => res.sendStatus(200));
         }
 
-        if (txt === "4") {
+        if (msg === "4") {
             estado.stage = "fluxo_listagem";
             return enviarMensagemWhatsApp(
                 telefone,
-                "Beleza! Para listar imóveis, envie tudo em **uma única mensagem**:\n\n" +
+                "Envie **tudo em uma única mensagem**:\n\n" +
                 "1️⃣ Tipo do imóvel\n" +
-                "2️⃣ Bairro/região\n" +
+                "2️⃣ Região\n" +
                 "3️⃣ Preço máximo\n" +
                 "4️⃣ Quartos\n" +
-                "5️⃣ Finalidade (moradia / investimento)"
+                "5️⃣ Finalidade"
             ).then(() => res.sendStatus(200));
         }
 
-        if (txt === "0") {
+        if (msg === "0") {
             estado.stage = "aguardando_corretor";
             return enviarMensagemWhatsApp(
                 telefone,
-                "📞 Perfeito! Vou te conectar com um corretor.\n\n" +
+                "📞 Certo! Vou te conectar com um corretor humano.\n\n" +
                 "Envie por favor:\n" +
                 "• Seu nome completo\n" +
                 "• Melhor horário para contato\n" +
-                "• Assunto (compra, venda, dúvida…)\n\n" +
-                "Assim que enviar, um corretor te chama. 🙂"
+                "• Assunto (compra, venda, financiamento)\n\n" +
+                "Assim que enviar, o corretor te chama! 🙂"
             ).then(() => res.sendStatus(200));
         }
 
-        // Entrada inválida → mostra o menu novamente
+        // Resposta inválida → mostra menu de novo
         await enviarMensagemWhatsApp(telefone, menuPrincipal());
         return res.sendStatus(200);
     }
 
     // ===============================================
-    // 🔥 FLUXOS QUE GERAM RESUMO E ENCERRAM
+    // 🔥 FLUXOS QUE FINALIZAM E ENVIAM PARA CORRETOR
     // ===============================================
-    if (estado.stage.startsWith("fluxo_")) {
+    if (
+        estado.stage === "fluxo_compra" ||
+        estado.stage === "fluxo_venda" ||
+        estado.stage === "fluxo_financiamento" ||
+        estado.stage === "fluxo_listagem"
+    ) {
         const resumo = await gerarResumoIA(estado.stage, msg);
 
         await enviarMensagemWhatsApp(telefone, resumo);
 
         await enviarMensagemWhatsApp(
             telefone,
-            "Ótimo! Já encaminhei suas informações para um corretor.\n" +
-            "Ele irá te chamar em instantes."
+            "Perfeito! Encaminhei tudo para o corretor.\nEle vai te chamar em instantes. 🙂"
         );
 
         estado.stage = "aguardando_corretor";
@@ -172,7 +164,6 @@ app.post("/webhook", async (req, res) => {
 
     return res.sendStatus(200);
 });
-
 
 // ===============================================
 // 🔥 MENU PRINCIPAL
@@ -183,24 +174,23 @@ function menuPrincipal() {
         "Escolha uma opção:\n\n" +
         "1️⃣ Comprar imóvel\n" +
         "2️⃣ Vender imóvel\n" +
-        "3️⃣ Consultar financiamento\n" +
+        "3️⃣ Financiamento\n" +
         "4️⃣ Ver imóveis disponíveis\n" +
         "0️⃣ Falar com um corretor"
     );
 }
 
-
 // ===============================================
-// 🔥 IA — ORGANIZAÇÃO DO RESUMO
+// 🔥 IA – RESUMO
 // ===============================================
 async function gerarResumoIA(fluxo, msg) {
     const prompt = `
-Organize profissionalmente as informações abaixo em forma de lista.
+Organize de forma profissional as informações do cliente.
 Fluxo: ${fluxo}
-Conteúdo: ${msg}
+Respostas do cliente: ${msg}
 
 Formato:
-- Título
+- Título do fluxo
 - Lista organizada
 - Agradecimento final
     `;
@@ -211,7 +201,7 @@ Formato:
             {
                 model: "gpt-4o-mini",
                 messages: [
-                    { role: "system", content: "Atue como atendente profissional da JF Almeida Imóveis." },
+                    { role: "system", content: "Você é um atendente profissional da JF Almeida Imóveis." },
                     { role: "user", content: prompt }
                 ]
             },
@@ -225,27 +215,30 @@ Formato:
 
         return r.data.choices[0].message.content;
     } catch (e) {
-        console.log("❌ ERRO IA:", e.response?.data || e.message);
-        return "Recebemos suas informações.";
+        console.log("ERRO IA:", e.response?.data || e.message);
+        return "Recebi suas informações e já enviei ao corretor!";
     }
 }
 
-
 // ===============================================
-// 🔥 ENVIO DE MENSAGEM VIA Z-API
+// 🔥 FUNÇÃO: ENVIO DE MENSAGEM VIA Z-API
 // ===============================================
 async function enviarMensagemWhatsApp(telefone, texto) {
     try {
         await axios.post(
             `https://api.z-api.io/instances/${ZAPI_NUMBER}/token/${ZAPI_TOKEN}/send-text`,
-            { phone: telefone, message: texto },
-            { headers: { "Client-Token": ZAPI_CLIENT_TOKEN } }
+            {
+                phone: telefone,
+                message: texto
+            },
+            {
+                headers: { "Client-Token": ZAPI_CLIENT_TOKEN }
+            }
         );
     } catch (e) {
         console.log("❌ ERRO ENVIO:", e.response?.data || e.message);
     }
 }
-
 
 // ===============================================
 // 🔥 SERVIDOR
