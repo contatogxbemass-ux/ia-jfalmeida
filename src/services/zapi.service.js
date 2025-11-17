@@ -5,9 +5,6 @@ const ZAPI_NUMBER = process.env.ZAPI_NUMBER;
 const ZAPI_TOKEN = process.env.ZAPI_TOKEN;
 const ZAPI_CLIENT_TOKEN = process.env.ZAPI_CLIENT_TOKEN;
 
-/**
- * Envia texto simples
- */
 async function sendText(phone, message) {
     if (!phone || phone.includes("-group") || phone.endsWith("@g.us")) {
         console.log("⛔ Bloqueado envio para grupo:", phone);
@@ -20,14 +17,12 @@ async function sendText(phone, message) {
             { phone, message },
             { headers: { "Client-Token": ZAPI_CLIENT_TOKEN } }
         );
+
     } catch (err) {
         console.log("❌ Erro sendText:", err.response?.data || err.message);
     }
 }
 
-/**
- * Envia BOTÕES reais (replyButtons NÃO FUNCIONAM!)
- */
 async function sendButtons(phone, message, buttons) {
     if (!phone || phone.includes("-group") || phone.endsWith("@g.us")) {
         console.log("⛔ Bloqueado envio para grupo:", phone);
@@ -36,7 +31,7 @@ async function sendButtons(phone, message, buttons) {
 
     try {
         await axios.post(
-            `https://api.z-api.io/instances/${ZAPI_NUMBER}/token/${ZAPI_TOKEN}/send-button-message`,
+            `https://api.z-api.io/instances/${ZAPI_NUMBER}/token/${ZAPI_TOKEN}/send-buttons`,
             {
                 phone,
                 message,
@@ -48,6 +43,7 @@ async function sendButtons(phone, message, buttons) {
                 }
             }
         );
+
     } catch (err) {
         console.log("❌ Erro sendButtons:", err.response?.data || err.message);
     }
