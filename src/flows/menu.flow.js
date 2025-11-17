@@ -1,37 +1,53 @@
+const { sendText } = require("../services/zapi.service");
+const { updateSession } = require("../services/redis.service");
 const { showMainMenu } = require("../utils/menu.util");
 
-module.exports = async function menuFlow(from, msg, state, ctx) {
-  msg = msg.trim();
+module.exports = async function menuFlow(telefone, msg, state) {
+  const op = msg.trim();
 
-  // Usuário digitou "menu"
-  if (msg.toLowerCase() === "menu") {
-    await ctx.setState({ etapa: "menu" });
-    return ctx.send(showMainMenu());
-  }
-
-  switch (msg) {
+  switch (op) {
     case "1":
-      await ctx.setState({ etapa: "compra_inicio" });
-      return ctx.send("Perfeito! Vamos iniciar o atendimento de compra.\n\nQual cidade você procura o imóvel?");
+      await updateSession(telefone, { etapa: "compra_tipo", dados: {} });
+      return sendText(
+        telefone,
+        "Perfeito! Qual *tipo de imóvel* você deseja comprar?"
+      );
 
     case "2":
-      await ctx.setState({ etapa: "aluguel_inicio" });
-      return ctx.send("Ótimo! Vamos iniciar o atendimento de aluguel.\n\nQual cidade você procura o imóvel?");
+      await updateSession(telefone, { etapa: "alug_cliente_tipo", dados: {} });
+      return sendText(
+        telefone,
+        "Ótimo! Qual *tipo de imóvel* você deseja alugar?"
+      );
 
     case "4":
-      await ctx.setState({ etapa: "venda_inicio" });
-      return ctx.send("Vamos avaliar seu imóvel para venda.\n\nQual o endereço do imóvel?");
+      await updateSession(telefone, { etapa: "venda_tipo", dados: {} });
+      return sendText(
+        telefone,
+        "Certo! Qual *tipo de imóvel* você deseja vender?"
+      );
 
     case "5":
-      await ctx.setState({ etapa: "venda_inicio" });
-      return ctx.send("Vamos iniciar o processo de colocar o imóvel para aluguel.\n\nQual o endereço do imóvel?");
+      await updateSession(telefone, { etapa: "alug_prop_tipo", dados: {} });
+      return sendText(
+        telefone,
+        "Vamos anunciar seu imóvel para aluguel.\n\nQual o *tipo de imóvel*?"
+      );
 
     case "0":
-      await ctx.setState({ etapa: "humano" });
-      return ctx.send("Certo! Encaminhando você para um corretor.");
+      await updateSession(telefone, {
+        etapa: "aguardando_corretor",
+        dados: {},
+      });
+      return sendText(
+        telefone,
+        "📞 Encaminhando para um corretor humano.\n\nEnvie:\n• Seu nome\n• Melhor horário\n• Assunto"
+      );
 
     default:
-      await ctx.setState({ etapa: "menu" });
-      return ctx.send(showMainMenu());
+      return sendText(
+        telefone,
+        "Opção inválida.\n\n" + showMainMenu()
+      );
   }
 };

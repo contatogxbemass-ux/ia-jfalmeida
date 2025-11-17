@@ -1,53 +1,25 @@
 const Redis = require("ioredis");
 
-// Conexão com Redis
+// Conexão com Redis (Upstash / Render)
 const redis = new Redis(process.env.REDIS_URL, {
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
 });
 
-// TTLs
-const SESSION_TTL = 86400;      // 24h para sessão
-const TENANT_MAP_TTL = 86400;   // 24h para mapa telefone -> tenant
+const SESSION_TTL = 60 * 60 * 24; // 24h
 
-// ===============================
-// Helpers internos
-// ===============================
-
-function sessionKey(tenantId, phone) {
-  return `session:${tenantId}:${phone}`;
+function sessionKey(phone) {
+  return `session:${phone}`;
 }
 
-function tenantKey(phone) {
-  return `tenant:${phone}`;
-}
+async function getSession(phone) {
+  if (!phone) throw new Error("Telefone é obrigatório na sessão");
 
-// ===============================
-// Registrar telefone -> tenant (instanceId)
-// ===============================
-
-async function setTenantForPhone(phone, tenantId) {
-  if (!phone || !tenantId) return;
-  await redis.set(tenantKey(phone), tenantId, "EX", TENANT_MAP_TTL);
-}
-
-async function getTenantForPhone(phone) {
-  const t = await redis.get(tenantKey(phone));
-  return t || "default";
-}
-
-// ===============================
-// Sessão multi-tenant por instanceId
-// ===============================
-
-async function getSession(phone, tenantId) {
-  if (!tenantId) tenantId = await getTenantForPhone(phone);
-
-  const key = sessionKey(tenantId, phone);
+  const key = sessionKey(phone);
   const raw = await redis.get(key);
 
   if (!raw) {
-    const initialState = {
+    const initial = {
       etapa: "menu",
       dados: {},
       lastMessageId: null,
@@ -55,29 +27,43 @@ async function getSession(phone, tenantId) {
       silencio: false,
     };
 
-    await redis.set(key, JSON.stringify(initialState), "EX", SESSION_TTL);
-    return initialState;
+    await redis.set(key, JSON.stringify(initial), "EX", SESSION_TTL);
+    return initial;
   }
 
-  return JSON.parse(raw);
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    console.error("Erro ao parsear sessão, resetando:", e.message);
+    await redis.del(key);
+    const initial = {
+      etapa: "menu",
+      dados: {},
+      lastMessageId: null,
+      paused: false,
+      silencio: false,
+    };
+    await redis.set(key, JSON.stringify(initial), "EX", SESSION_TTL);
+    return initial;
+  }
 }
 
-async function updateSession(phone, data, tenantId) {
-  if (!tenantId) tenantId = await getTenantForPhone(phone);
+async function updateSession(phone, data) {
+  if (!phone) throw new Error("Telefone é obrigatório na sessão");
 
-  const current = await getSession(phone, tenantId);
+  const key = sessionKey(phone);
+  const current = await getSession(phone);
   const updated = { ...current, ...data };
 
-  const key = sessionKey(tenantId, phone);
   await redis.set(key, JSON.stringify(updated), "EX", SESSION_TTL);
-
   return updated;
 }
 
-async function resetSession(phone, tenantId) {
-  if (!tenantId) tenantId = await getTenantForPhone(phone);
+async function resetSession(phone) {
+  if (!phone) throw new Error("Telefone é obrigatório na sessão");
 
-  const initialState = {
+  const key = sessionKey(phone);
+  const initial = {
     etapa: "menu",
     dados: {},
     lastMessageId: null,
@@ -85,8 +71,8 @@ async function resetSession(phone, tenantId) {
     silencio: false,
   };
 
-  await redis.set(sessionKey(tenantId, phone), JSON.stringify(initialState), "EX", SESSION_TTL);
-  return initialState;
+  await redis.set(key, JSON.stringify(initial), "EX", SESSION_TTL);
+  return initial;
 }
 
 module.exports = {
@@ -94,6 +80,4 @@ module.exports = {
   getSession,
   updateSession,
   resetSession,
-  setTenantForPhone,
-  getTenantForPhone,
 };

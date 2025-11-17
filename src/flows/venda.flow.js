@@ -1,39 +1,62 @@
+const { sendText } = require("../services/zapi.service");
+const { updateSession } = require("../services/redis.service");
 const { gerarResumoIA } = require("../services/openai.service");
 
-module.exports = async function vendaFlow(phone, msg, state, ctx) {
-  state.fluxo = "Venda";
-  state.telefone = phone;
+module.exports = async function vendaFlow(telefone, msg, state) {
   state.dados = state.dados || {};
 
-  if (state.etapa === "venda_inicio") {
-    state.dados.cidade = msg;
-    await ctx.setState({ etapa: "venda_tipo", ...state });
-    await ctx.send("Qual tipo de imóvel deseja vender?");
-    return;
-  }
+  switch (state.etapa) {
+    case "venda_tipo":
+      state.dados.tipo = msg;
+      await updateSession(telefone, {
+        etapa: "venda_local",
+        dados: state.dados,
+      });
+      return sendText(telefone, "Qual *bairro/região* do imóvel?");
 
-  if (state.etapa === "venda_tipo") {
-    state.dados.tipo = msg;
-    await ctx.setState({ etapa: "venda_tamanho", ...state });
-    await ctx.send("Qual tamanho do imóvel?");
-    return;
-  }
+    case "venda_local":
+      state.dados.local = msg;
+      await updateSession(telefone, {
+        etapa: "venda_tamanho",
+        dados: state.dados,
+      });
+      return sendText(
+        telefone,
+        "Qual o *tamanho* do imóvel? (m² / número de quartos)"
+      );
 
-  if (state.etapa === "venda_tamanho") {
-    state.dados.tamanho = msg;
-    await ctx.setState({ etapa: "venda_valor", ...state });
-    await ctx.send("Qual valor desejado?");
-    return;
-  }
+    case "venda_tamanho":
+      state.dados.tamanho = msg;
+      await updateSession(telefone, {
+        etapa: "venda_estado",
+        dados: state.dados,
+      });
+      return sendText(
+        telefone,
+        "Qual o *estado de conservação*? (novo, reformado, precisa reforma...)"
+      );
 
-  if (state.etapa === "venda_valor") {
-    state.dados.valor = msg;
-    await ctx.send("Gerando resumo...");
+    case "venda_estado":
+      state.dados.estado = msg;
+      await updateSession(telefone, {
+        etapa: "venda_valor",
+        dados: state.dados,
+      });
+      return sendText(telefone, "Qual o *valor desejado*?");
 
-    const resumo = await gerarResumoIA("default", state.fluxo, state.dados, phone);
-    await ctx.send(resumo);
+    case "venda_valor":
+      state.dados.valor = msg;
 
-    await ctx.send("Encaminhado ao corretor!");
-    await ctx.setState({ etapa: "aguardando_corretor" });
+      await sendText(telefone, "Gerando resumo para o corretor...");
+      const resumo = await gerarResumoIA("venda_imovel", state.dados, telefone);
+
+      await sendText(telefone, resumo);
+      await sendText(telefone, "Informações enviadas ao corretor!");
+
+      await updateSession(telefone, {
+        etapa: "aguardando_corretor",
+        dados: {},
+      });
+      return;
   }
 };

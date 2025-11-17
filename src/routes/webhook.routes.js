@@ -9,13 +9,12 @@ const compraFlow = require("../flows/compra.flow");
 const aluguelFlow = require("../flows/aluguel.flow");
 const vendaFlow = require("../flows/venda.flow");
 
-const { menuPrincipal } = require("../utils/menu.util");
+const { showMainMenu } = require("../utils/menu.util");
 
 // ======================================================
-// 🔥 WEBHOOK PRINCIPAL (VERSÃO FINAL COM REDIS)
+// 🔥 WEBHOOK PRINCIPAL (VERSÃO REDIS / JF ALMEIDA)
 // ======================================================
 router.post("/", async (req, res) => {
-
   console.log("📩 RECEBIDO DO Z-API:", JSON.stringify(req.body, null, 2));
 
   const telefone = req.body.phone || req.body.connectedPhone;
@@ -24,7 +23,11 @@ router.post("/", async (req, res) => {
   if (!telefone || !msg) return res.sendStatus(200);
 
   // Bloqueio de grupos
-  if (req.body.isGroup || telefone.includes("-group") || telefone.endsWith("@g.us")) {
+  if (
+    req.body.isGroup ||
+    telefone.includes("-group") ||
+    telefone.endsWith("@g.us")
+  ) {
     console.log("⛔ Mensagem de grupo bloqueada");
     return res.sendStatus(200);
   }
@@ -32,7 +35,7 @@ router.post("/", async (req, res) => {
   // Carrega sessão
   let state = await getSession(telefone);
 
-  // Anti duplicidade
+  // Anti-duplicidade
   const messageId = req.body.messageId;
   if (state.lastMessageId === messageId) return res.sendStatus(200);
   state = await updateSession(telefone, { lastMessageId: messageId });
@@ -40,12 +43,15 @@ router.post("/", async (req, res) => {
   const msgLower = msg.toLowerCase();
 
   // ======================================================
-  // 🔥 COMANDOS GLOBAIS (Redis)
+  // 🔥 COMANDOS GLOBAIS
   // ======================================================
 
   if (msgLower === "/pausar") {
     await updateSession(telefone, { paused: true });
-    await sendText(telefone, "⏸️ Bot pausado. Digite /voltar para continuar.");
+    await sendText(
+      telefone,
+      "⏸️ Bot pausado. Digite /voltar para continuar."
+    );
     return res.sendStatus(200);
   }
 
@@ -57,13 +63,16 @@ router.post("/", async (req, res) => {
 
   if (msgLower === "menu" || msgLower === "/menu") {
     await resetSession(telefone);
-    await sendText(telefone, menuPrincipal());
+    await sendText(telefone, showMainMenu());
     return res.sendStatus(200);
   }
 
   // Se estiver pausado, bloqueia tudo
   if (state.paused) {
-    await sendText(telefone, "⏸️ Bot pausado. Digite /voltar para continuar.");
+    await sendText(
+      telefone,
+      "⏸️ Bot pausado. Digite /voltar para continuar."
+    );
     return res.sendStatus(200);
   }
 

@@ -1,37 +1,48 @@
 const axios = require("axios");
+require("dotenv").config();
 
-async function gerarResumoIA(tenantId, fluxo, dados, telefone) {
+const OPENAI_KEY = process.env.OPENAI_KEY;
+
+async function gerarResumoIA(fluxo, dados, telefone) {
   const prompt = `
-Resumo interno de atendimento:
+Monte um resumo profissional para o corretor da JF Almeida:
 
 Fluxo: ${fluxo}
 Telefone: ${telefone}
 
-Dados coletados:
-${Object.entries(dados).map(([k, v]) => `- ${k}: ${v}`).join("\n")}
+Dados:
+${JSON.stringify(dados, null, 2)}
 
-Gere um resumo profissional, direto, objetivo, para uso interno.
-`;
+Monte:
+- Título
+- Pontos organizados (bullet points)
+- Observações importantes
+- Fechamento curto para o corretor
+  `;
 
-  const res = await axios.post(
-    "https://api.openai.com/v1/chat/completions",
-    {
-      model: "gpt-4o-mini",
-      temperature: 0.2,
-      messages: [
-        { role: "system", content: "Você é um assistente objetivo e profissional." },
-        { role: "user", content: prompt }
-      ],
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_KEY}`,
-        "Content-Type": "application/json",
+  try {
+    const r = await axios.post(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: "Você é um assistente da JF Almeida, direto e profissional." },
+          { role: "user", content: prompt },
+        ],
       },
-    }
-  );
+      {
+        headers: {
+          Authorization: `Bearer ${OPENAI_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
-  return res.data.choices[0].message.content;
+    return r.data.choices[0].message.content;
+  } catch (e) {
+    console.log("ERRO IA:", e.response?.data || e.message);
+    return "Resumo interno gerado e encaminhado ao corretor.";
+  }
 }
 
 module.exports = { gerarResumoIA };

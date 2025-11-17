@@ -2,19 +2,19 @@ function showMainMenu() {
   return `
 👋 Bem-vindo(a) à JF Almeida Imóveis!
 
-🏡 IMÓVEIS
+🏡 *IMÓVEIS*
 1️⃣ Comprar
 2️⃣ Alugar
 
-🏠 PROPRIETÁRIO
+🏠 *PROPRIETÁRIO*
 4️⃣ Vender imóvel
 5️⃣ Colocar imóvel para aluguel
 
-👤 HUMANO
+👤 *HUMANO*
 0️⃣ Falar com corretor
 
 Digite *menu* a qualquer momento.
-`;
+  `;
 }
 
 module.exports = { showMainMenu };
