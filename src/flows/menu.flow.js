@@ -3,7 +3,7 @@ const { showMainMenu } = require("../utils/menu.util");
 module.exports = async function menuFlow(from, msg, state, ctx) {
   msg = msg.trim();
 
-  // Forçando entrada do menu quando usuário digita "menu"
+  // Usuário digitou "menu"
   if (msg.toLowerCase() === "menu") {
     await ctx.setState({ etapa: "menu" });
     return ctx.send(showMainMenu());
@@ -28,10 +28,9 @@ module.exports = async function menuFlow(from, msg, state, ctx) {
 
     case "0":
       await ctx.setState({ etapa: "humano" });
-      return ctx.send("Certo! Encaminhando você para um corretor humano.");
+      return ctx.send("Certo! Encaminhando você para um corretor.");
 
     default:
-      // Usuário mandou algo fora do menu → volta ao menu, sem erro
       await ctx.setState({ etapa: "menu" });
       return ctx.send(showMainMenu());
   }
