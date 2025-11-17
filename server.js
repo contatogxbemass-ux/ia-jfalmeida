@@ -13,13 +13,14 @@ const app = express();
 
 app.use(bodyParser.json());
 
-// ORDEM EXATA
+// ORDEM EXATA DOS MIDDLEWARES
 app.use(loggerMiddleware);
 app.use(rateLimitMiddleware);
 app.use(commandsMiddleware);
 app.use(pauseMiddleware);
 app.use(routerMiddleware);
 
+// ROTAS
 app.use("/", webhookRoutes);
 
 const PORT = process.env.PORT || 10000;
