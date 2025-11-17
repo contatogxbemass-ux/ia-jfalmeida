@@ -4,39 +4,40 @@ const { gerarResumoIA } = require("../services/openai.service");
 
 module.exports = async function listFlow(telefone, msg, state) {
     state.dados = state.dados || {};
+    state.fluxo = "listagem_imoveis";
+    state.telefone = telefone;
 
     if (state.etapa === "list_tipo") {
         state.dados.tipo = msg;
-        await updateSession(telefone, { etapa: "list_regiao", dados: state.dados });
+        await updateSession(telefone, { etapa: "list_regiao", dados: state.dados, fluxo: state.fluxo });
         return sendText(telefone, "Bairro/região desejada?");
     }
 
     if (state.etapa === "list_regiao") {
         state.dados.regiao = msg;
-        await updateSession(telefone, { etapa: "list_preco", dados: state.dados });
+        await updateSession(telefone, { etapa: "list_preco", dados: state.dados, fluxo: state.fluxo });
         return sendText(telefone, "Preço máximo?");
     }
 
     if (state.etapa === "list_preco") {
         state.dados.preco = msg;
-        await updateSession(telefone, { etapa: "list_quartos", dados: state.dados });
+        await updateSession(telefone, { etapa: "list_quartos", dados: state.dados, fluxo: state.fluxo });
         return sendText(telefone, "Quantos quartos?");
     }
 
     if (state.etapa === "list_quartos") {
         state.dados.quartos = msg;
-        await updateSession(telefone, { etapa: "list_finalidade", dados: state.dados });
+        await updateSession(telefone, { etapa: "list_finalidade", dados: state.dados, fluxo: state.fluxo });
         return sendText(telefone, "Finalidade? (moradia/investimento)");
     }
 
     if (state.etapa === "list_finalidade") {
         state.dados.finalidade = msg;
 
-        const resumo = await gerarResumoIA("listagem_imoveis", state.dados, telefone);
+        const resumo = await gerarResumoIA("listagem_imoveis", state);
         await sendText(telefone, resumo);
         await sendText(telefone, "Encaminhei ao corretor!");
 
         await updateSession(telefone, { etapa: "aguardando_corretor", dados: {} });
-        return;
     }
 };

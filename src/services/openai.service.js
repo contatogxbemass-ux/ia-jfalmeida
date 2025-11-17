@@ -19,18 +19,43 @@ function basePrompt(tenantId) {
   return t.promptBase.trim();
 }
 
+// 🔥 Função que normaliza tudo ANTES de mandar à IA
+function formatarDados(dados) {
+  if (!dados) return "Nenhum dado coletado.";
+
+  if (typeof dados === "string") return dados;
+
+  try {
+    return Object.entries(dados)
+      .map(([k, v]) => `- ${k}: ${v}`)
+      .join("\n");
+  } catch {
+    return JSON.stringify(dados, null, 2);
+  }
+}
+
 async function gerarResumoIA(tenantId, fluxo, dados, telefone) {
+
+  const fluxoNome =
+    typeof fluxo === "string"
+      ? fluxo
+      : fluxo?.nome || fluxo?.flow || "Fluxo não identificado";
+
+  const dadosFormatados = formatarDados(dados);
+
   const prompt = `
 ${basePrompt(tenantId)}
 
-Fluxo: ${fluxo}
-Telefone: ${telefone}
+*Resumo interno de atendimento*
+
+Fluxo: ${fluxoNome}
+Telefone: ${telefone || "Não informado"}
 
 Dados coletados:
-${JSON.stringify(dados, null, 2)}
+${dadosFormatados}
 
-Monte um resumo profissional, direto e usado internamente.
-  `;
+Monte um resumo profissional, direto, sem enfeites, para uso interno pelo corretor.
+`;
 
   for (let i = 1; i <= RETRIES; i++) {
     try {
@@ -38,9 +63,9 @@ Monte um resumo profissional, direto e usado internamente.
         "https://api.openai.com/v1/chat/completions",
         {
           model: MODEL,
-          temperature: 0.3,
+          temperature: 0.2,
           messages: [
-            { role: "system", content: "Você é um assistente profissional." },
+            { role: "system", content: "Você é um assistente extremamente objetivo e profissional." },
             { role: "user", content: prompt }
           ],
         },
