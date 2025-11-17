@@ -18,10 +18,11 @@ router.post("/", async (req, res) => {
 
   if (!telefone || !msg) return res.sendStatus(200);
 
-  if (req.body.isGroup || telefone.includes("-group") || telefone.endsWith("@g.us")) {
+  if (req.body.isGroup || telefone.endsWith("@g.us") || telefone.includes("-group")) {
     return res.sendStatus(200);
   }
 
+  // ===== Carregar ou criar estado =====
   let state = getState(telefone);
 
   if (!state) {
@@ -30,51 +31,63 @@ router.post("/", async (req, res) => {
 
     await sendText(
       telefone,
-      "📍 *Menu Principal*\n\n🏘️ 1 — Comprar Imóvel\n🏡 2 — Alugar Imóvel\n💰 3 — Vender Imóvel"
+      "📍 *Menu Principal*\n\n1 — Comprar imóvel\n2 — Alugar imóvel\n3 — Vender imóvel"
     );
 
     return res.sendStatus(200);
   }
 
+  // ===== Evitar duplicidade =====
   const messageId = req.body.messageId;
   if (state.lastMessageId === messageId) return res.sendStatus(200);
-
   updateState(telefone, { ...state, lastMessageId: messageId });
 
   const msgLower = msg.toLowerCase();
 
+  // ===== Reset de menu =====
   if (msgLower === "menu") {
     updateState(telefone, { etapa: "menu", dados: {} });
 
     await sendText(
       telefone,
-      "📍 *Menu Principal*\n\n🏘️ 1 — Comprar Imóvel\n🏡 2 — Alugar Imóvel\n💰 3 — Vender Imóvel"
+      "📍 *Menu Principal*\n\n1 — Comprar imóvel\n2 — Alugar imóvel\n3 — Vender imóvel"
     );
 
     return res.sendStatus(200);
   }
 
+  // ===== MENU =====
   if (state.etapa === "menu") {
     await menuFlow(telefone, msg, state);
     return res.sendStatus(200);
   }
 
+  // ===== COMPRA =====
   if (state.etapa.startsWith("compra_")) {
     await compraFlow(telefone, msg, state);
     return res.sendStatus(200);
   }
 
+  // ===== ALUGUEL =====
   if (state.etapa.startsWith("alug_")) {
     await aluguelFlow(telefone, msg, state);
     return res.sendStatus(200);
   }
 
+  // ===== VENDA =====
   if (state.etapa.startsWith("venda_")) {
     await vendaFlow(telefone, msg, state);
     return res.sendStatus(200);
   }
 
-  await sendText(telefone, "Não entendi. Envie *menu*.");
+  // ===== FAIL SAFE =====
+  updateState(telefone, { etapa: "menu", dados: {} });
+
+  await sendText(
+    telefone,
+    "📍 *Menu Principal*\n\n1 — Comprar imóvel\n2 — Alugar imóvel\n3 — Vender imóvel"
+  );
+
   return res.sendStatus(200);
 });
 
