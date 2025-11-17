@@ -4,8 +4,10 @@ import showMainMenu from "../utils/menu.util.js";
 const menuFlow = async (ctx) => {
   const msg = ctx.message?.trim();
 
-  // MENU PRINCIPAL
-  await ctx.send(showMainMenu());
+  // Se o usuário digitou EXATAMENTE "menu"
+  if (msg.toLowerCase() === "menu") {
+    return ctx.send(showMainMenu());
+  }
 
   if (!msg) return;
 
@@ -32,6 +34,7 @@ const menuFlow = async (ctx) => {
       );
 
     default:
+      // Aqui sim o menu deve aparecer junto com erro
       return ctx.send("Opção inválida.\n\n" + showMainMenu());
   }
 };
