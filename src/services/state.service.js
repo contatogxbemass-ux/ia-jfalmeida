@@ -1,6 +1,6 @@
-// ===============================
+// =====================================
 // ESTADO GLOBAL (em memória)
-// ===============================
+// =====================================
 const estados = {};
 
 /**
@@ -11,6 +11,7 @@ function getState(telefone) {
         estados[telefone] = {
             etapa: "menu",
             dados: {},
+            lastMessageId: null,
             silencio: false
         };
     }
@@ -26,12 +27,13 @@ function updateState(telefone, newState) {
 }
 
 /**
- * Reseta o estado do usuário (volta ao menu)
+ * Reseta completamente o estado do usuário
  */
 function resetState(telefone) {
     estados[telefone] = {
         etapa: "menu",
         dados: {},
+        lastMessageId: null,
         silencio: false
     };
 }
