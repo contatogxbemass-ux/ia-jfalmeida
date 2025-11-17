@@ -1,30 +1,31 @@
-const { updateState } = require("../services/state.service");
+const { updateSession } = require("../services/redis.service");
 const { sendText } = require("../services/zapi.service");
 const { gerarResumoIA } = require("../services/openai.service");
 
 module.exports = async function listFlow(telefone, msg, state) {
+    state.dados = state.dados || {};
 
     if (state.etapa === "list_tipo") {
         state.dados.tipo = msg;
-        updateState(telefone, { etapa: "list_regiao", dados: state.dados });
+        await updateSession(telefone, { etapa: "list_regiao", dados: state.dados });
         return sendText(telefone, "Bairro/região desejada?");
     }
 
     if (state.etapa === "list_regiao") {
         state.dados.regiao = msg;
-        updateState(telefone, { etapa: "list_preco", dados: state.dados });
+        await updateSession(telefone, { etapa: "list_preco", dados: state.dados });
         return sendText(telefone, "Preço máximo?");
     }
 
     if (state.etapa === "list_preco") {
         state.dados.preco = msg;
-        updateState(telefone, { etapa: "list_quartos", dados: state.dados });
+        await updateSession(telefone, { etapa: "list_quartos", dados: state.dados });
         return sendText(telefone, "Quantos quartos?");
     }
 
     if (state.etapa === "list_quartos") {
         state.dados.quartos = msg;
-        updateState(telefone, { etapa: "list_finalidade", dados: state.dados });
+        await updateSession(telefone, { etapa: "list_finalidade", dados: state.dados });
         return sendText(telefone, "Finalidade? (moradia/investimento)");
     }
 
@@ -35,7 +36,7 @@ module.exports = async function listFlow(telefone, msg, state) {
         await sendText(telefone, resumo);
         await sendText(telefone, "Encaminhei ao corretor!");
 
-        updateState(telefone, { etapa: "aguardando_corretor" });
+        await updateSession(telefone, { etapa: "aguardando_corretor", dados: {} });
         return;
     }
 };

@@ -1,9 +1,10 @@
 const { sendText } = require("../services/zapi.service");
-const { updateState } = require("../services/state.service");
-const { iaResumo } = require("../services/openai.service");
+const { updateSession } = require("../services/redis.service");
+const { gerarResumoIA } = require("../services/openai.service");
 
 module.exports = async function aluguelFlow(telefone, msg, state) {
-  
+  state.dados = state.dados || {};
+
   // ============================
   // CLIENTE QUER ALUGAR
   // ============================
@@ -11,7 +12,7 @@ module.exports = async function aluguelFlow(telefone, msg, state) {
     switch (state.etapa) {
       case "alug_cliente_tipo":
         state.dados.tipo = msg;
-        updateState(telefone, {
+        await updateSession(telefone, {
           etapa: "alug_cliente_regiao",
           dados: state.dados,
         });
@@ -19,7 +20,7 @@ module.exports = async function aluguelFlow(telefone, msg, state) {
 
       case "alug_cliente_regiao":
         state.dados.regiao = msg;
-        updateState(telefone, {
+        await updateSession(telefone, {
           etapa: "alug_cliente_orcamento",
           dados: state.dados,
         });
@@ -27,7 +28,7 @@ module.exports = async function aluguelFlow(telefone, msg, state) {
 
       case "alug_cliente_orcamento":
         state.dados.orcamento = msg;
-        updateState(telefone, {
+        await updateSession(telefone, {
           etapa: "alug_cliente_quartos",
           dados: state.dados,
         });
@@ -35,7 +36,7 @@ module.exports = async function aluguelFlow(telefone, msg, state) {
 
       case "alug_cliente_quartos":
         state.dados.quartos = msg;
-        updateState(telefone, {
+        await updateSession(telefone, {
           etapa: "alug_cliente_data",
           dados: state.dados,
         });
@@ -43,7 +44,7 @@ module.exports = async function aluguelFlow(telefone, msg, state) {
 
       case "alug_cliente_data":
         state.dados.data = msg;
-        updateState(telefone, {
+        await updateSession(telefone, {
           etapa: "alug_cliente_finalidade",
           dados: state.dados,
         });
@@ -53,7 +54,7 @@ module.exports = async function aluguelFlow(telefone, msg, state) {
         state.dados.finalidade = msg;
 
         await sendText(telefone, "Gerando resumo...");
-        const resumoCliente = await iaResumo(
+        const resumoCliente = await gerarResumoIA(
           "aluguel_cliente",
           state.dados,
           telefone
@@ -62,7 +63,7 @@ module.exports = async function aluguelFlow(telefone, msg, state) {
         await sendText(telefone, resumoCliente);
         await sendText(telefone, "Informações enviadas ao corretor!");
 
-        updateState(telefone, { etapa: "aguardando_corretor", dados: {} });
+        await updateSession(telefone, { etapa: "aguardando_corretor", dados: {} });
         return;
     }
   }
@@ -74,7 +75,7 @@ module.exports = async function aluguelFlow(telefone, msg, state) {
     switch (state.etapa) {
       case "alug_prop_tipo":
         state.dados.tipo = msg;
-        updateState(telefone, {
+        await updateSession(telefone, {
           etapa: "alug_prop_endereco",
           dados: state.dados,
         });
@@ -82,7 +83,7 @@ module.exports = async function aluguelFlow(telefone, msg, state) {
 
       case "alug_prop_endereco":
         state.dados.endereco = msg;
-        updateState(telefone, {
+        await updateSession(telefone, {
           etapa: "alug_prop_quartos",
           dados: state.dados,
         });
@@ -90,7 +91,7 @@ module.exports = async function aluguelFlow(telefone, msg, state) {
 
       case "alug_prop_quartos":
         state.dados.quartos = msg;
-        updateState(telefone, {
+        await updateSession(telefone, {
           etapa: "alug_prop_estado",
           dados: state.dados,
         });
@@ -98,7 +99,7 @@ module.exports = async function aluguelFlow(telefone, msg, state) {
 
       case "alug_prop_estado":
         state.dados.estado = msg;
-        updateState(telefone, {
+        await updateSession(telefone, {
           etapa: "alug_prop_valor",
           dados: state.dados,
         });
@@ -106,7 +107,7 @@ module.exports = async function aluguelFlow(telefone, msg, state) {
 
       case "alug_prop_valor":
         state.dados.valor = msg;
-        updateState(telefone, {
+        await updateSession(telefone, {
           etapa: "alug_prop_garantia",
           dados: state.dados,
         });
@@ -116,7 +117,7 @@ module.exports = async function aluguelFlow(telefone, msg, state) {
         state.dados.garantia = msg;
 
         await sendText(telefone, "Gerando resumo...");
-        const resumoProp = await iaResumo(
+        const resumoProp = await gerarResumoIA(
           "aluguel_proprietario",
           state.dados,
           telefone
@@ -125,7 +126,7 @@ module.exports = async function aluguelFlow(telefone, msg, state) {
         await sendText(telefone, resumoProp);
         await sendText(telefone, "Informações enviadas ao corretor!");
 
-        updateState(telefone, { etapa: "aguardando_corretor", dados: {} });
+        await updateSession(telefone, { etapa: "aguardando_corretor", dados: {} });
         return;
     }
   }

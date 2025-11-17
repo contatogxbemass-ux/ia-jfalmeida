@@ -1,5 +1,5 @@
 const { sendText } = require("../services/zapi.service");
-const { updateState } = require("../services/state.service");
+const { updateSession } = require("../services/redis.service");
 const { showMainMenu } = require("../utils/menu.util");
 
 module.exports = async function menuFlow(telefone, msg, state) {
@@ -7,28 +7,35 @@ module.exports = async function menuFlow(telefone, msg, state) {
 
   switch (op) {
     case "1":
-      updateState(telefone, { etapa: "compra_tipo", dados: {} });
+      await updateSession(telefone, { etapa: "compra_tipo", dados: {} });
       return sendText(
         telefone,
         "Perfeito! Qual *tipo de imóvel* você deseja comprar?"
       );
 
     case "2":
-      updateState(telefone, { etapa: "alug_cliente_tipo", dados: {} });
+      await updateSession(telefone, { etapa: "alug_cliente_tipo", dados: {} });
       return sendText(
         telefone,
         "Ótimo! Qual *tipo de imóvel* você deseja alugar?"
       );
 
     case "3":
-      updateState(telefone, { etapa: "venda_tipo", dados: {} });
+      await updateSession(telefone, { etapa: "venda_tipo", dados: {} });
       return sendText(
         telefone,
         "Certo! Qual *tipo de imóvel* você deseja vender?"
       );
 
+    case "4":
+      await updateSession(telefone, { etapa: "alug_prop_tipo", dados: {} });
+      return sendText(
+        telefone,
+        "Vamos anunciar seu imóvel para aluguel.\n\nQual o *tipo de imóvel*?"
+      );
+
     case "0":
-      updateState(telefone, {
+      await updateSession(telefone, {
         etapa: "aguardando_corretor",
         dados: {},
       });
@@ -38,7 +45,6 @@ module.exports = async function menuFlow(telefone, msg, state) {
       );
 
     default:
-      // AQUI chamamos o menu bonito
       return sendText(
         telefone,
         "Opção inválida.\n\n" + showMainMenu()

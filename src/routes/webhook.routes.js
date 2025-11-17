@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const { getState, updateState } = require("../services/state.service");
+const { getSession, updateSession, resetSession } = require("../services/redis.service");
 const { sendText } = require("../services/zapi.service");
 
 const menuFlow = require("../flows/menu.flow");
@@ -9,11 +9,10 @@ const compraFlow = require("../flows/compra.flow");
 const aluguelFlow = require("../flows/aluguel.flow");
 const vendaFlow = require("../flows/venda.flow");
 
-// IMPORTA O MENU BONITO
 const { menuPrincipal } = require("../utils/menu.util");
 
 // ======================================================
-// 🔥 WEBHOOK PRINCIPAL
+// 🔥 WEBHOOK PRINCIPAL (VERSÃO FINAL COM REDIS)
 // ======================================================
 router.post("/", async (req, res) => {
 
@@ -30,54 +29,41 @@ router.post("/", async (req, res) => {
     return res.sendStatus(200);
   }
 
-  // Carrega estado do usuário
-  let state = getState(telefone);
-
-  // Cria novo estado se não existir
-  if (!state) {
-    state = { etapa: "menu", dados: {}, lastMessageId: null, silencio: false, paused: false };
-    updateState(telefone, state);
-
-    await sendText(telefone, menuPrincipal());
-    return res.sendStatus(200);
-  }
-
-  const messageId = req.body.messageId;
+  // Carrega sessão
+  let state = await getSession(telefone);
 
   // Anti duplicidade
+  const messageId = req.body.messageId;
   if (state.lastMessageId === messageId) return res.sendStatus(200);
-  updateState(telefone, { ...state, lastMessageId: messageId });
+  state = await updateSession(telefone, { lastMessageId: messageId });
 
   const msgLower = msg.toLowerCase();
 
   // ======================================================
-  // 🔥 COMANDOS GLOBAIS /pausar e /voltar
+  // 🔥 COMANDOS GLOBAIS (Redis)
   // ======================================================
 
   if (msgLower === "/pausar") {
-    updateState(telefone, { paused: true });
+    await updateSession(telefone, { paused: true });
     await sendText(telefone, "⏸️ Bot pausado. Digite /voltar para continuar.");
     return res.sendStatus(200);
   }
 
   if (msgLower === "/voltar") {
-    updateState(telefone, { paused: false });
+    await updateSession(telefone, { paused: false });
     await sendText(telefone, "▶️ Bot retomado.");
     return res.sendStatus(200);
   }
 
-  // Bloqueia qualquer ação enquanto estiver pausado
-  if (state.paused) {
-    await sendText(telefone, "Bot pausado. Digite /voltar para continuar.");
+  if (msgLower === "menu" || msgLower === "/menu") {
+    await resetSession(telefone);
+    await sendText(telefone, menuPrincipal());
     return res.sendStatus(200);
   }
 
-  // ======================================================
-  // 🔥 RESET DE MENU
-  // ======================================================
-  if (msgLower === "menu") {
-    updateState(telefone, { etapa: "menu", dados: {} });
-    await sendText(telefone, menuPrincipal());
+  // Se estiver pausado, bloqueia tudo
+  if (state.paused) {
+    await sendText(telefone, "⏸️ Bot pausado. Digite /voltar para continuar.");
     return res.sendStatus(200);
   }
 
@@ -90,30 +76,29 @@ router.post("/", async (req, res) => {
   }
 
   // ======================================================
-  // 🔥 DIRECIONAMENTO PARA OS FLUXOS
+  // 🔥 FLUXOS
   // ======================================================
 
-  // COMPRA
   if (state.etapa.startsWith("compra_")) {
     await compraFlow(telefone, msg, state);
     return res.sendStatus(200);
   }
 
-  // ALUGUEL (cliente + proprietário)
   if (state.etapa.startsWith("alug_")) {
     await aluguelFlow(telefone, msg, state);
     return res.sendStatus(200);
   }
 
-  // VENDA
   if (state.etapa.startsWith("venda_")) {
     await vendaFlow(telefone, msg, state);
     return res.sendStatus(200);
   }
 
-  // FAIL SAFE
+  // ======================================================
+  // 🔥 FAIL SAFE
+  // ======================================================
   await sendText(telefone, "Não entendi. Digite *menu*.");
-  updateState(telefone, { etapa: "menu", dados: {} });
+  await resetSession(telefone);
 
   return res.sendStatus(200);
 });

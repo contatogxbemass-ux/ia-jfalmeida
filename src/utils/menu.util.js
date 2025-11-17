@@ -1,20 +1,13 @@
-function showMainMenu() {
-  return `
-🏢 *JF Almeida Imóveis — Sistema Premium*
+const tenants = require("../config/tenants.config");
 
-🏡 *IMÓVEIS*
-⿡ 1 — Comprar
-⿢ 2 — Alugar
-
-🏠 *PROPRIETÁRIO*
-⿤ 3 — Vender imóvel
-⿥ 4 — Colocar imóvel para aluguel
-
-👤 *HUMANO*
-⿠ 0 — Falar com corretor
-
-Digite *menu* a qualquer momento.
-  `;
+/**
+ * Gera o menu correto baseado no tenantId
+ */
+function getMenuForTenant(tenantId) {
+  const config = tenants[tenantId] || tenants["default"];
+  return config.menu;
 }
 
-module.exports = { showMainMenu };
+module.exports = {
+  getMenuForTenant,
+};
