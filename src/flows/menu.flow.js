@@ -2,14 +2,15 @@ import { updateSession } from "../services/redis.service.js";
 import showMainMenu from "../utils/menu.util.js";
 
 const menuFlow = async (ctx) => {
-  const msg = ctx.message?.trim();
+  const msg = ctx.message?.trim() || "";
 
-  // Se o usuário digitou EXATAMENTE "menu"
+  // Toda entrada no menu SETA a etapa
+  await updateSession(ctx.from, { etapa: "menu" });
+
+  // Se o usuário digitou "menu"
   if (msg.toLowerCase() === "menu") {
     return ctx.send(showMainMenu());
   }
-
-  if (!msg) return;
 
   switch (msg) {
     case "1":
@@ -26,7 +27,7 @@ const menuFlow = async (ctx) => {
 
     case "5":
       await updateSession(ctx.from, { etapa: "lista" });
-      return ctx.send("Lista de imóveis do proprietário.");
+      return ctx.send("Certo! Vamos acessar os imóveis do proprietário.");
 
     case "0":
       return ctx.send(
@@ -34,7 +35,7 @@ const menuFlow = async (ctx) => {
       );
 
     default:
-      // Aqui sim o menu deve aparecer junto com erro
+      // ERRO + MENU
       return ctx.send("Opção inválida.\n\n" + showMainMenu());
   }
 };
