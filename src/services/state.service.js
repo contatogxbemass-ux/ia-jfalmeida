@@ -1,22 +1,43 @@
+// ===============================
+// ESTADO GLOBAL (em memória)
+// ===============================
 const estados = {};
 
-function initState(phone) {
-    if (!estados[phone]) {
-        estados[phone] = {
+/**
+ * Retorna o estado do usuário ou cria um novo
+ */
+function getState(telefone) {
+    if (!estados[telefone]) {
+        estados[telefone] = {
             etapa: "menu",
             dados: {},
-            lastMessageId: null,
+            silencio: false
         };
     }
-    return estados[phone];
+    return estados[telefone];
 }
 
-function getState(phone) {
-    return estados[phone];
+/**
+ * Atualiza o estado do usuário
+ */
+function updateState(telefone, newState) {
+    if (!estados[telefone]) estados[telefone] = {};
+    estados[telefone] = { ...estados[telefone], ...newState };
 }
 
-function updateState(phone, update) {
-    estados[phone] = { ...estados[phone], ...update };
+/**
+ * Reseta o estado do usuário (volta ao menu)
+ */
+function resetState(telefone) {
+    estados[telefone] = {
+        etapa: "menu",
+        dados: {},
+        silencio: false
+    };
 }
 
-module.exports = { initState, getState, updateState };
+module.exports = {
+    getState,
+    updateState,
+    resetState
+};

@@ -1,18 +1,36 @@
-const { sendButtons } = require("../services/buttons.service");
+const { sendMessage } = require("../services/zapi.service");
+const { updateState } = require("../services/state.service");
 
-async function menuPrincipalFlow(phone) {
-  await sendButtons(
-    phone,
-    "👋 *Bem-vindo(a) à JF Almeida Imóveis!*\nSelecione uma opção:",
-    [
-      { id: "1", text: "1️⃣ Comprar" },
-      { id: "2", text: "2️⃣ Alugar" },
-      { id: "3", text: "3️⃣ Ver imóveis" },
-      { id: "4", text: "4️⃣ Vender imóvel" },
-      { id: "5", text: "5️⃣ Colocar para aluguel" },
-      { id: "0", text: "0️⃣ Falar com corretor" }
-    ]
-  );
-}
+module.exports = async function menuFlow(telefone, msg, state) {
 
-module.exports = { menuPrincipalFlow };
+    const op = msg.trim();
+
+    if (op === "1") {
+        updateState(telefone, { etapa: "compra_tipo", dados: {} });
+        return sendMessage(telefone, "Qual *tipo de imóvel* deseja comprar?", [
+            { id: "apto", title: "Apartamento" },
+            { id: "casa", title: "Casa" },
+            { id: "sobrado", title: "Sobrado" }
+        ]);
+    }
+
+    if (op === "2") {
+        updateState(telefone, { etapa: "alug_cliente_tipo", dados: {} });
+        return sendMessage(telefone, "Qual *tipo de imóvel* deseja alugar?", [
+            { id: "apto", title: "Apartamento" },
+            { id: "casa", title: "Casa" },
+            { id: "kitnet", title: "Kitnet" }
+        ]);
+    }
+
+    if (op === "3") {
+        updateState(telefone, { etapa: "venda_tipo", dados: {} });
+        return sendMessage(telefone, "Qual *tipo de imóvel* deseja vender?", [
+            { id: "apto", title: "Apartamento" },
+            { id: "casa", title: "Casa" },
+            { id: "sobrado", title: "Sobrado" }
+        ]);
+    }
+
+    return sendMessage(telefone, "Escolha uma opção do menu:");
+};

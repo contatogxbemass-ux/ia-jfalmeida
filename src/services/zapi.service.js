@@ -1,26 +1,42 @@
 const axios = require("axios");
-require("dotenv").config();
 
 const ZAPI_NUMBER = process.env.ZAPI_NUMBER;
 const ZAPI_TOKEN = process.env.ZAPI_TOKEN;
 const ZAPI_CLIENT_TOKEN = process.env.ZAPI_CLIENT_TOKEN;
 
-// Envio DE MENSAGEM com bloqueio 100% seguro contra grupos
-async function sendMessage(phone, message) {
+/**
+ * Envia mensagens para o WhatsApp (texto + replyButtons)
+ */
+async function sendMessage(telefone, texto, replyButtons = null) {
     try {
-        if (!phone || phone.includes("-group") || phone.endsWith("@g.us")) {
-            console.log("⛔ BLOQUEADO: tentativa de envio para grupo:", phone);
+
+        // BLOQUEIO ABSOLUTO PARA GRUPOS
+        if (telefone.includes("-group") || telefone.includes("@g.us")) {
+            console.log("⛔ Tentativa de envio para grupo bloqueada:", telefone);
             return;
+        }
+
+        const payload = {
+            phone: telefone,
+            message: texto
+        };
+
+        // Se houver botões
+        if (Array.isArray(replyButtons) && replyButtons.length > 0) {
+            payload.replyButtons = replyButtons;
         }
 
         await axios.post(
             `https://api.z-api.io/instances/${ZAPI_NUMBER}/token/${ZAPI_TOKEN}/send-text`,
-            { phone, message },
+            payload,
             { headers: { "Client-Token": ZAPI_CLIENT_TOKEN } }
         );
+
     } catch (err) {
-        console.log("ERRO ENVIO:", err.response?.data || err.message);
+        console.log("❌ Erro ao enviar mensagem:", err.response?.data || err.message);
     }
 }
 
-module.exports = { sendMessage };
+module.exports = {
+    sendMessage
+};
