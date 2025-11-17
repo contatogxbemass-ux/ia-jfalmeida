@@ -37,27 +37,41 @@ router.post("/", async (req, res) => {
 
   const msgLower = msg.toLowerCase();
 
-  // COMANDOS
+  // ======================================================
+  // ⛔️ PAUSAR
+  // ======================================================
   if (msgLower === "/pausar") {
     await updateSession(telefone, { paused: true });
     return res.sendStatus(200);
   }
 
+  // ======================================================
+  // ▶️ VOLTAR
+  // ======================================================
   if (msgLower === "/voltar") {
-    await updateSession(telefone, { paused: false });
-    await sendText(telefone, "▶️ Bot retomado.");
+    await updateSession(telefone, { paused: false, etapa: "menu" });
+    await sendText(telefone, showMainMenu());
     return res.sendStatus(200);
   }
 
+  // ======================================================
+  // ⛔️ SE PAUSADO, IGNORA TUDO
+  // ======================================================
   if (state.paused) return res.sendStatus(200);
 
+  // ======================================================
+  // MENU RESET
+  // ======================================================
   if (msgLower === "menu") {
     await resetSession(telefone);
     await sendText(telefone, showMainMenu());
     return res.sendStatus(200);
   }
 
-  // MENU
+  // ======================================================
+  // ROTEAMENTO POR ETAPA
+  // ======================================================
+
   if (state.etapa === "menu") {
     await menuFlow({
       from: telefone,
@@ -68,7 +82,6 @@ router.post("/", async (req, res) => {
     return res.sendStatus(200);
   }
 
-  // FLUXOS
   if (state.etapa === "compra") {
     await compraFlow({
       from: telefone,
@@ -109,7 +122,9 @@ router.post("/", async (req, res) => {
     return res.sendStatus(200);
   }
 
-  // FAILSAFE
+  // ======================================================
+  // FALLBACK
+  // ======================================================
   await sendText(telefone, "Não entendi. Digite *menu*.");
   await resetSession(telefone);
 
