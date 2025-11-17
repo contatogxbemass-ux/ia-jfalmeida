@@ -10,20 +10,16 @@ import routerMiddleware from "./src/middlewares/router.middleware.js";
 import webhookRoutes from "./src/routes/webhook.routes.js";
 
 const app = express();
-
 app.use(bodyParser.json());
 
-// ORDEM EXATA DOS MIDDLEWARES
 app.use(loggerMiddleware);
 app.use(rateLimitMiddleware);
 app.use(commandsMiddleware);
 app.use(pauseMiddleware);
 app.use(routerMiddleware);
 
-// ROTAS
 app.use("/", webhookRoutes);
 
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
+app.listen(process.env.PORT || 10000, () => {
+  console.log("Servidor rodando");
 });

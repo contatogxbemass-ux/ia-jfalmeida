@@ -1,4 +1,4 @@
-import { getSession } from "../services/redis.service.js";
+import { getSession, updateSession } from "../services/redis.service.js";
 import menuFlow from "../flows/menu.flow.js";
 import compraFlow from "../flows/compra.flow.js";
 import aluguelFlow from "../flows/aluguel.flow.js";
@@ -7,42 +7,38 @@ import listFlow from "../flows/list.flow.js";
 
 async function routerMiddleware(req, res, next) {
   try {
-    const body = req.body;
-    const phone = body?.phone;
-    const msg = body?.text?.message;
+    const phone = req.body?.phone;
+    const msg = req.body?.text?.message;
 
     if (!phone || !msg) return next();
 
+    const replies = [];
     const session = await getSession(phone);
 
     const ctx = {
       from: phone,
       message: msg,
-      send: (txt) => res.json({ reply: txt }),
-      setState: async (state) => updateSession(phone, state),
+      async send(text) {
+        replies.push(text);
+      },
+      async setState(data) {
+        await updateSession(phone, data);
+      }
     };
 
     switch (session.etapa) {
-      case "menu":
-        return menuFlow(ctx);
-
-      case "compra":
-        return compraFlow(ctx);
-
-      case "aluguel":
-        return aluguelFlow(ctx);
-
-      case "venda":
-        return vendaFlow(ctx);
-
-      case "lista":
-        return listFlow(ctx);
-
-      default:
-        return menuFlow(ctx);
+      case "menu": await menuFlow(ctx); break;
+      case "compra": await compraFlow(ctx); break;
+      case "aluguel": await aluguelFlow(ctx); break;
+      case "venda": await vendaFlow(ctx); break;
+      case "lista": await listFlow(ctx); break;
+      default: await menuFlow(ctx); break;
     }
-  } catch (err) {
-    console.log("Erro no routerMiddleware:", err);
+
+    return res.json({ replies });
+
+  } catch (e) {
+    console.log("Erro no routerMiddleware:", e);
     next();
   }
 }

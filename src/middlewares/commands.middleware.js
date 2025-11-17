@@ -1,39 +1,35 @@
-import { getSession, updateSession, delAsync } from "../services/redis.service.js";
+import { updateSession, resetSession } from "../services/redis.service.js";
 
 async function commandsMiddleware(req, res, next) {
   try {
     const body = req.body;
-    if (!body || !body.text || !body.phone) {
-      return next();
-    }
+    const phone = body?.phone;
+    const msg = body?.text?.message?.trim()?.toLowerCase();
 
-    const msg = body.text.message?.trim()?.toLowerCase();
-    const phone = body.phone;
+    if (!phone || !msg) return next();
 
-    if (!msg) return next();
-
-    // /pausar
+    // PAUSAR O BOT
     if (msg === "/pausar") {
       await updateSession(phone, { paused: true });
-      return res.json({ status: "OK" });
+      return res.json({ ok: true });
     }
 
-    // /voltar
+    // VOLTAR O BOT
     if (msg === "/voltar") {
       await updateSession(phone, { paused: false });
-      return res.json({ status: "OK" });
+      return res.json({ ok: true });
     }
 
-    // limpar sessão
+    // RESETAR SESSÃO
     if (msg === "/resetar") {
-      await delAsync(`session:${phone}`);
-      return res.json({ status: "sessão resetada" });
+      await resetSession(phone);
+      return res.json({ ok: true });
     }
 
-    return next();
-  } catch (err) {
-    console.log("Erro no commandsMiddleware:", err);
-    return next();
+    next();
+  } catch (e) {
+    console.log("Erro no commandsMiddleware:", e);
+    next();
   }
 }
 
