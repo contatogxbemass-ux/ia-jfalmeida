@@ -1,9 +1,6 @@
 const { sendMessage } = require("../services/zapi.service");
-const { updateState } = require("../services.state.service");
-const { iaResumo } = require("../services/openai.service");
-
-// ATENÇÃO: caminho certo:
 const { updateState } = require("../services/state.service");
+const { iaResumo } = require("../services/openai.service");
 
 module.exports = async function vendaFlow(telefone, msg, state) {
   switch (state.etapa) {
@@ -22,7 +19,10 @@ module.exports = async function vendaFlow(telefone, msg, state) {
         etapa: "venda_tamanho",
         dados: state.dados,
       });
-      await sendMessage(telefone, "Qual o *tamanho ou número de quartos* do imóvel?");
+      await sendMessage(
+        telefone,
+        "Qual o *tamanho ou número de quartos* do imóvel?"
+      );
       return;
 
     case "venda_tamanho":
@@ -31,7 +31,10 @@ module.exports = async function vendaFlow(telefone, msg, state) {
         etapa: "venda_estado",
         dados: state.dados,
       });
-      await sendMessage(telefone, "Como está o *estado de conservação*? (novo, reformado, precisa de reforma...)");
+      await sendMessage(
+        telefone,
+        "Como está o *estado de conservação*? (novo, reformado, precisa de reforma...)"
+      );
       return;
 
     case "venda_estado":
@@ -46,8 +49,17 @@ module.exports = async function vendaFlow(telefone, msg, state) {
     case "venda_valor":
       state.dados.valor = msg;
 
-      await sendMessage(telefone, "Gerando resumo do imóvel para o corretor...");
-      const resumoVenda = await iaResumo("venda_imovel", state.dados, telefone);
+      await sendMessage(
+        telefone,
+        "Gerando resumo do imóvel para o corretor..."
+      );
+
+      const resumoVenda = await iaResumo(
+        "venda_imovel",
+        state.dados,
+        telefone
+      );
+
       await sendMessage(telefone, resumoVenda);
       await sendMessage(
         telefone,
@@ -58,6 +70,7 @@ module.exports = async function vendaFlow(telefone, msg, state) {
         etapa: "aguardando_corretor",
         dados: {},
       });
+
       return;
   }
 };
