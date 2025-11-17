@@ -1,5 +1,6 @@
 const { sendText } = require("../services/zapi.service");
 const { updateState } = require("../services/state.service");
+const { showMainMenu } = require("../utils/menu.util");
 
 module.exports = async function menuFlow(telefone, msg, state) {
   const op = msg.trim();
@@ -37,9 +38,10 @@ module.exports = async function menuFlow(telefone, msg, state) {
       );
 
     default:
+      // AQUI chamamos o menu bonito
       return sendText(
         telefone,
-        "Opção inválida.\n\nDigite:\n1 — Comprar\n2 — Alugar\n3 — Vender\n0 — Corretor"
+        "Opção inválida.\n\n" + showMainMenu()
       );
   }
 };
