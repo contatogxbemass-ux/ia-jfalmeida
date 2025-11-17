@@ -2,15 +2,25 @@ const menuFlow = require("../flows/menu.flow");
 const compraFlow = require("../flows/compra.flow");
 const aluguelFlow = require("../flows/aluguel.flow");
 const vendaFlow = require("../flows/venda.flow");
+const { showMainMenu } = require("../utils/menu.util");
 
 module.exports = async (ctx, next) => {
   const state = ctx.state || {};
-  const msg = ctx.body;
+  const msg = ctx.body.trim();
 
-  if (!state.etapa || state.etapa === "menu") {
+  // Se não existe etapa → sempre abrir o menu
+  if (!state.etapa) {
+    await ctx.setState({ etapa: "menu" });
+    await ctx.send(showMainMenu());
+    return;
+  }
+
+  // Se está no menu
+  if (state.etapa === "menu") {
     return menuFlow(ctx.from, msg, state, ctx);
   }
 
+  // Rotas por fluxo
   if (state.etapa.startsWith("compra_")) {
     return compraFlow(ctx.from, msg, state, ctx);
   }
@@ -23,6 +33,7 @@ module.exports = async (ctx, next) => {
     return vendaFlow(ctx.from, msg, state, ctx);
   }
 
-  await ctx.send("Não entendi. Digite *menu*.");
-  await ctx.resetState();
+  // QUALQUER COISA FORA DO FLUXO → VOLTA PARA O MENU SEM MENSAGEM
+  await ctx.setState({ etapa: "menu" });
+  await ctx.send(showMainMenu());
 };
