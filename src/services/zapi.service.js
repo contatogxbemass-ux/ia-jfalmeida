@@ -6,17 +6,17 @@ const ZAPI_TOKEN = process.env.ZAPI_TOKEN;
 const ZAPI_CLIENT_TOKEN = process.env.ZAPI_CLIENT_TOKEN;
 
 async function sendText(phone, message) {
-  try {
-    if (phone.includes("-group") || phone.endsWith("@g.us")) return;
+    if (phone.endsWith("@g.us") || phone.includes("-group")) return;
 
-    await axios.post(
-      `https://api.z-api.io/instances/${ZAPI_NUMBER}/token/${ZAPI_TOKEN}/send-text`,
-      { phone, message },
-      { headers: { "Client-Token": ZAPI_CLIENT_TOKEN } }
-    );
-  } catch (err) {
-    console.log("Erro ao enviar:", err.response?.data || err.message);
-  }
+    try {
+        await axios.post(
+            `https://api.z-api.io/instances/${ZAPI_NUMBER}/token/${ZAPI_TOKEN}/send-text`,
+            { phone, message },
+            { headers: { "Client-Token": ZAPI_CLIENT_TOKEN } }
+        );
+    } catch (e) {
+        console.log("Erro sendText:", e.response?.data || e.message);
+    }
 }
 
 module.exports = { sendText };

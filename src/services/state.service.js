@@ -5,15 +5,13 @@ function getState(telefone) {
         estados[telefone] = {
             etapa: "menu",
             dados: {},
-            lastMessageId: null,
-            silencio: false
+            lastMessageId: null
         };
     }
     return estados[telefone];
 }
 
 function updateState(telefone, newState) {
-    if (!estados[telefone]) estados[telefone] = {};
     estados[telefone] = { ...estados[telefone], ...newState };
 }
 
@@ -21,8 +19,7 @@ function resetState(telefone) {
     estados[telefone] = {
         etapa: "menu",
         dados: {},
-        lastMessageId: null,
-        silencio: false
+        lastMessageId: null
     };
 }
 
