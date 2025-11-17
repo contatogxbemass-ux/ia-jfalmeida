@@ -1,36 +1,35 @@
 // src/middlewares/router.middleware.js
 
-import { menuFlow } from "../flows/menu.flow.js";
-import { compraFlow } from "../flows/compra.flow.js";
-import { aluguelFlow } from "../flows/aluguel.flow.js";
-import { vendaFlow } from "../flows/venda.flow.js";
-import { listFlow } from "../flows/list.flow.js";
+import aluguelFlow from "../flows/aluguel.flow.js";
+import compraFlow from "../flows/compra.flow.js";
+import vendaFlow from "../flows/venda.flow.js";
+import listFlow from "../flows/list.flow.js";
+import menuFlow from "../flows/menu.flow.js";
 
 export const routerMiddleware = async (ctx, next) => {
-  const state = ctx.state || {};
+  const state = ctx.state;
 
-  // Se não tem etapa → vai para o menu automaticamente
-  if (!state.etapa) {
-    state.etapa = "menu";
-    await ctx.setState(state);
+  if (!state || !state.etapa) {
+    return menuFlow(ctx);
   }
 
-  const etapa = state.etapa;
-
-  switch (etapa) {
+  switch (state.etapa) {
     case "menu":
-      return menuFlow(ctx, next);
+      return menuFlow(ctx);
+
     case "compra":
-      return compraFlow(ctx, next);
+      return compraFlow(ctx);
+
     case "aluguel":
-      return aluguelFlow(ctx, next);
+      return aluguelFlow(ctx);
+
     case "venda":
-      return vendaFlow(ctx, next);
-    case "list":
-      return listFlow(ctx, next);
+      return vendaFlow(ctx);
+
+    case "lista":
+      return listFlow(ctx);
+
     default:
-      state.etapa = "menu";
-      await ctx.setState(state);
-      return menuFlow(ctx, next);
+      return menuFlow(ctx);
   }
 };
