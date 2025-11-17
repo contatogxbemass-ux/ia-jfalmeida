@@ -6,6 +6,8 @@ export const commandsMiddleware = async (ctx, next) => {
   const body = ctx.body?.trim().toLowerCase();
   const phone = ctx.from;
 
+  if (!body) return next();
+
   // PAUSAR BOT
   if (body === "/pausar") {
     await setAsync(`pause:${phone}`, "true");
@@ -20,6 +22,5 @@ export const commandsMiddleware = async (ctx, next) => {
     return;
   }
 
-  // Continua fluxo
   return next();
 };

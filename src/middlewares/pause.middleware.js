@@ -5,15 +5,14 @@ import { getAsync } from "../services/redis.service.js";
 export const pauseMiddleware = async (ctx, next) => {
   try {
     const phone = ctx.from;
+    const isPaused = await getAsync(`pause:${phone}`);
 
-    const paused = await getAsync(`pause:${phone}`);
-
-    // Se pausado → NÃO envia nada e NÃO chama next()
-    if (paused === "true") {
-      return; 
+    // Se o usuário está pausado → silêncio total
+    if (isPaused === "true") {
+      return;
     }
 
-    // Se não está pausado → segue fluxo normal
+    // Senão → segue fluxo normal
     return next();
 
   } catch (error) {

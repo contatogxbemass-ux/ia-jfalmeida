@@ -1,3 +1,4 @@
+// src/services/redis.service.js
 import Redis from "ioredis";
 
 const redis = new Redis(process.env.REDIS_URL, {
@@ -9,6 +10,21 @@ const SESSION_TTL = 60 * 60 * 24; // 24h
 
 function sessionKey(phone) {
   return `session:${phone}`;
+}
+
+export async function getAsync(key) {
+  return redis.get(key);
+}
+
+export async function setAsync(key, value, ttlSeconds = SESSION_TTL) {
+  if (ttlSeconds) {
+    return redis.set(key, value, "EX", ttlSeconds);
+  }
+  return redis.set(key, value);
+}
+
+export async function delAsync(key) {
+  return redis.del(key);
 }
 
 export async function getSession(phone) {
