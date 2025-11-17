@@ -1,75 +1,68 @@
-const { sendText } = require("../services/zapi.service");
-const { updateSession } = require("../services/redis.service");
 const { showMainMenu } = require("../utils/menu.util");
 
-module.exports = async function menuFlow(telefone, msg, state) {
-  const op = msg.trim();
+module.exports = async function menuFlow(phone, msg, state, ctx) {
+  const option = msg.trim();
 
-  switch (op) {
-    case "1":
-      await updateSession(telefone, {
-        etapa: "compra_tipo",
-        fluxo: "Compra de Imóvel",
-        telefone,
-        dadosColetados: {}
+  // MENU PRINCIPAL
+  if (!state.etapa || state.etapa === "menu") {
+    if (option === "1") {
+      await ctx.setState({
+        etapa: "compra_inicio",
+        fluxo: "Compra",
+        telefone: phone,
+        dados: {}
       });
-      return sendText(
-        telefone,
-        "Perfeito! Qual *tipo de imóvel* você deseja comprar?"
-      );
 
-    case "2":
-      await updateSession(telefone, {
-        etapa: "alug_cliente_tipo",
-        fluxo: "Aluguel - Cliente",
-        telefone,
-        dadosColetados: {}
+      await ctx.send("Perfeito! Vamos começar seu atendimento de COMPRA.\nQual cidade deseja?");
+      return;
+    }
+
+    if (option === "2") {
+      await ctx.setState({
+        etapa: "aluguel_inicio",
+        fluxo: "Aluguel",
+        telefone: phone,
+        dados: {}
       });
-      return sendText(
-        telefone,
-        "Ótimo! Qual *tipo de imóvel* você deseja alugar?"
-      );
 
-    case "3":
-      await updateSession(telefone, {
-        etapa: "venda_tipo",
-        fluxo: "Venda de Imóvel",
-        telefone,
-        dadosColetados: {}
+      await ctx.send("Vamos iniciar seu atendimento de ALUGUEL.\nQual cidade deseja?");
+      return;
+    }
+
+    if (option === "4") {
+      await ctx.setState({
+        etapa: "venda_inicio",
+        fluxo: "Venda",
+        telefone: phone,
+        dados: {}
       });
-      return sendText(
-        telefone,
-        "Certo! Qual *tipo de imóvel* você deseja vender?"
-      );
 
-    case "4":
-      await updateSession(telefone, {
-        etapa: "alug_prop_tipo",
-        fluxo: "Aluguel - Proprietário",
-        telefone,
-        dadosColetados: {}
+      await ctx.send("Vamos começar a AVALIAÇÃO DE VENDA.\nInforme a cidade:");
+      return;
+    }
+
+    if (option === "5") {
+      await ctx.setState({
+        etapa: "alugar_proprietario_inicio",
+        fluxo: "Alugar - Proprietário",
+        telefone: phone,
+        dados: {}
       });
-      return sendText(
-        telefone,
-        "Vamos anunciar seu imóvel para aluguel.\n\nQual o *tipo de imóvel*?"
-      );
 
-    case "0":
-      await updateSession(telefone, {
-        etapa: "aguardando_corretor",
-        fluxo: "Atendimento humano",
-        telefone,
-        dadosColetados: {}
-      });
-      return sendText(
-        telefone,
-        "📞 Encaminhando para um corretor humano.\n\nEnvie:\n• Seu nome\n• Melhor horário\n• Assunto"
-      );
+      await ctx.send("Vamos anunciar seu imóvel para ALUGAR.\nQual cidade?");
+      return;
+    }
 
-    default:
-      return sendText(
-        telefone,
-        "Opção inválida.\n\n" + showMainMenu()
-      );
+    if (option === "0") {
+      await ctx.setState({ etapa: "humano", fluxo: "Humano", telefone: phone });
+      await ctx.send("Encaminhando para um corretor...\nAguarde alguns instantes.");
+      return;
+    }
+
+    await ctx.send("Opção inválida.\n\n" + showMainMenu());
+    return;
   }
+
+  // FALLBACK (qualquer etapa inválida volta ao menu)
+  await ctx.send(showMainMenu());
 };

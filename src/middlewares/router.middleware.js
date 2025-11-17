@@ -2,43 +2,27 @@ const menuFlow = require("../flows/menu.flow");
 const compraFlow = require("../flows/compra.flow");
 const aluguelFlow = require("../flows/aluguel.flow");
 const vendaFlow = require("../flows/venda.flow");
-const listFlow = require("../flows/list.flow");
 
-module.exports = async function routerMiddleware(ctx, next) {
-  const { state, phone, msg } = ctx;
+module.exports = async (ctx, next) => {
+  const state = ctx.state || {};
+  const msg = ctx.body;
 
-  // MENU
-  if (state.etapa === "menu") {
-    await menuFlow(phone, msg, state);
-    return;
+  if (!state.etapa || state.etapa === "menu") {
+    return menuFlow(ctx.from, msg, state, ctx);
   }
 
-  // COMPRA
   if (state.etapa.startsWith("compra_")) {
-    await compraFlow(phone, msg, state);
-    return;
+    return compraFlow(ctx.from, msg, state, ctx);
   }
 
-  // ALUGUEL (cliente + proprietário)
-  if (state.etapa.startsWith("alug_")) {
-    await aluguelFlow(phone, msg, state);
-    return;
+  if (state.etapa.startsWith("aluguel_")) {
+    return aluguelFlow(ctx.from, msg, state, ctx);
   }
 
-  // VENDA
   if (state.etapa.startsWith("venda_")) {
-    await vendaFlow(phone, msg, state);
-    return;
+    return vendaFlow(ctx.from, msg, state, ctx);
   }
 
-  // LISTAGEM
-  if (state.etapa.startsWith("list_")) {
-    await listFlow(phone, msg, state);
-    return;
-  }
-
-  // Fallback
   await ctx.send("Não entendi. Digite *menu*.");
   await ctx.resetState();
-  return;
 };
