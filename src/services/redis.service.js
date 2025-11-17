@@ -1,93 +1,29 @@
-// src/services/redis.service.js
 import Redis from "ioredis";
 
 const redis = new Redis(process.env.REDIS_URL, {
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false,
+  tls: {
+    rejectUnauthorized: false,
+  },
 });
 
-const SESSION_TTL = 60 * 60 * 24; // 24h
-
-function sessionKey(phone) {
-  return `session:${phone}`;
-}
-
+// GET
 export async function getAsync(key) {
-  return redis.get(key);
+  const data = await redis.get(key);
+  return data ? JSON.parse(data) : null;
 }
 
-export async function setAsync(key, value, ttlSeconds = SESSION_TTL) {
-  if (ttlSeconds) {
-    return redis.set(key, value, "EX", ttlSeconds);
-  }
-  return redis.set(key, value);
+// SET
+export async function setAsync(key, value) {
+  return redis.set(key, JSON.stringify(value));
 }
 
+// DEL
 export async function delAsync(key) {
   return redis.del(key);
 }
 
-export async function getSession(phone) {
-  if (!phone) throw new Error("Telefone é obrigatório na sessão");
-
-  const key = sessionKey(phone);
-  const raw = await redis.get(key);
-
-  if (!raw) {
-    const initial = {
-      etapa: "menu",
-      dados: {},
-      lastMessageId: null,
-      paused: false,
-      silencio: false,
-    };
-
-    await redis.set(key, JSON.stringify(initial), "EX", SESSION_TTL);
-    return initial;
-  }
-
-  try {
-    return JSON.parse(raw);
-  } catch (e) {
-    console.error("Erro ao parsear sessão, resetando:", e.message);
-    await redis.del(key);
-    const initial = {
-      etapa: "menu",
-      dados: {},
-      lastMessageId: null,
-      paused: false,
-      silencio: false,
-    };
-    await redis.set(key, JSON.stringify(initial), "EX", SESSION_TTL);
-    return initial;
-  }
-}
-
-export async function updateSession(phone, data) {
-  if (!phone) throw new Error("Telefone é obrigatório na sessão");
-
-  const key = sessionKey(phone);
-  const current = await getSession(phone);
-  const updated = { ...current, ...data };
-
-  await redis.set(key, JSON.stringify(updated), "EX", SESSION_TTL);
-  return updated;
-}
-
-export async function resetSession(phone) {
-  if (!phone) throw new Error("Telefone é obrigatório na sessão");
-
-  const key = sessionKey(phone);
-  const initial = {
-    etapa: "menu",
-    dados: {},
-    lastMessageId: null,
-    paused: false,
-    silencio: false,
-  };
-
-  await redis.set(key, JSON.stringify(initial), "EX", SESSION_TTL);
-  return initial;
-}
-
-export { redis };
+export default {
+  getAsync,
+  setAsync,
+  delAsync,
+};
