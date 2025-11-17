@@ -1,41 +1,89 @@
-const { sendText } = require("../services/zapi.service");
 const { updateState } = require("../services/state.service");
-const { iaResumo } = require("../services/openai.service");
+const { sendText } = require("../services/zapi.service");
+const { gerarResumoIA } = require("../services/openai.service");
 
 module.exports = async function aluguelFlow(telefone, msg, state) {
 
-    switch (state.etapa) {
+    if (state.etapa === "alug_cliente_tipo") {
+        state.dados.tipo = msg;
+        updateState(telefone, { etapa: "alug_cliente_regiao", dados: state.dados });
+        return sendText(telefone, "Qual bairro/região?");
+    }
 
-        case "alug_cliente_tipo":
-            state.dados.tipo = msg;
-            updateState(telefone, { etapa: "alug_cliente_regiao", dados: state.dados });
-            return sendText(telefone, "📍 Qual bairro/região deseja?");
+    if (state.etapa === "alug_cliente_regiao") {
+        state.dados.regiao = msg;
+        updateState(telefone, { etapa: "alug_cliente_orcamento", dados: state.dados });
+        return sendText(telefone, "Orçamento máximo?");
+    }
 
-        case "alug_cliente_regiao":
-            state.dados.regiao = msg;
-            updateState(telefone, { etapa: "alug_cliente_orcamento", dados: state.dados });
-            return sendText(telefone, "💵 Qual o orçamento máximo mensal?");
+    if (state.etapa === "alug_cliente_orcamento") {
+        state.dados.orcamento = msg;
+        updateState(telefone, { etapa: "alug_cliente_quartos", dados: state.dados });
+        return sendText(telefone, "Quantos quartos?");
+    }
 
-        case "alug_cliente_orcamento":
-            state.dados.orcamento = msg;
-            updateState(telefone, { etapa: "alug_cliente_quartos", dados: state.dados });
-            return sendText(telefone, "🛏️ Quantos quartos precisa?");
+    if (state.etapa === "alug_cliente_quartos") {
+        state.dados.quartos = msg;
+        updateState(telefone, { etapa: "alug_cliente_data", dados: state.dados });
+        return sendText(telefone, "Quando pretende se mudar?");
+    }
 
-        case "alug_cliente_quartos":
-            state.dados.quartos = msg;
-            updateState(telefone, { etapa: "alug_cliente_data", dados: state.dados });
-            return sendText(telefone, "📅 Quando pretende se mudar?");
+    if (state.etapa === "alug_cliente_data") {
+        state.dados.dataMudanca = msg;
+        updateState(telefone, { etapa: "alug_cliente_finalidade", dados: state.dados });
+        return sendText(telefone, "Finalidade? (moradia/empresa)");
+    }
 
-        case "alug_cliente_data":
-            state.dados.data = msg;
+    if (state.etapa === "alug_cliente_finalidade") {
+        state.dados.finalidade = msg;
 
-            await sendText(telefone, "Gerando resumo...");
-            const resumo = await iaResumo("aluguel_cliente", state.dados, telefone);
+        const resumo = await gerarResumoIA("aluguel_imovel", state.dados, telefone);
+        await sendText(telefone, resumo);
+        await sendText(telefone, "Encaminhado ao corretor!");
 
-            await sendText(telefone, resumo);
-            await sendText(telefone, "As informações já foram enviadas ao corretor!");
+        updateState(telefone, { etapa: "aguardando_corretor" });
+        return;
+    }
 
-            updateState(telefone, { etapa: "aguardando_corretor", dados: {} });
-            return;
+    // PROPRIETÁRIO
+    if (state.etapa === "alug_prop_tipo") {
+        state.dados.tipo = msg;
+        updateState(telefone, { etapa: "alug_prop_endereco", dados: state.dados });
+        return sendText(telefone, "Endereço completo?");
+    }
+
+    if (state.etapa === "alug_prop_endereco") {
+        state.dados.endereco = msg;
+        updateState(telefone, { etapa: "alug_prop_quartos", dados: state.dados });
+        return sendText(telefone, "Quantos quartos?");
+    }
+
+    if (state.etapa === "alug_prop_quartos") {
+        state.dados.quartos = msg;
+        updateState(telefone, { etapa: "alug_prop_estado", dados: state.dados });
+        return sendText(telefone, "Estado de conservação?");
+    }
+
+    if (state.etapa === "alug_prop_estado") {
+        state.dados.estado = msg;
+        updateState(telefone, { etapa: "alug_prop_valor", dados: state.dados });
+        return sendText(telefone, "Valor desejado?");
+    }
+
+    if (state.etapa === "alug_prop_valor") {
+        state.dados.valor = msg;
+        updateState(telefone, { etapa: "alug_prop_garantia", dados: state.dados });
+        return sendText(telefone, "Tipo de garantia?");
+    }
+
+    if (state.etapa === "alug_prop_garantia") {
+        state.dados.garantia = msg;
+
+        const resumo = await gerarResumoIA("aluguel_proprietario", state.dados, telefone);
+        await sendText(telefone, resumo);
+        await sendText(telefone, "Corretor irá te chamar em breve!");
+
+        updateState(telefone, { etapa: "aguardando_corretor" });
+        return;
     }
 };

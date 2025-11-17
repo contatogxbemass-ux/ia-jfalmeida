@@ -1,41 +1,40 @@
-const { sendText } = require("../services/zapi.service");
 const { updateState } = require("../services/state.service");
-const { iaResumo } = require("../services/openai.service");
+const { sendText } = require("../services/zapi.service");
+const { gerarResumoIA } = require("../services/openai.service");
 
 module.exports = async function compraFlow(telefone, msg, state) {
 
-    switch (state.etapa) {
+    if (state.etapa === "compra_tipo") {
+        updateState(telefone, { etapa: "compra_regiao", dados: { tipo: msg } });
+        return sendText(telefone, "Qual bairro/região?");
+    }
 
-        case "compra_tipo":
-            state.dados.tipo = msg;
-            updateState(telefone, { etapa: "compra_regiao", dados: state.dados });
-            return sendText(telefone, "📍 Qual bairro/região deseja?");
+    if (state.etapa === "compra_regiao") {
+        state.dados.regiao = msg;
+        updateState(telefone, { etapa: "compra_orcamento", dados: state.dados });
+        return sendText(telefone, "Orçamento máximo?");
+    }
 
-        case "compra_regiao":
-            state.dados.regiao = msg;
-            updateState(telefone, { etapa: "compra_orcamento", dados: state.dados });
-            return sendText(telefone, "💵 Qual seu orçamento máximo?");
+    if (state.etapa === "compra_orcamento") {
+        state.dados.orcamento = msg;
+        updateState(telefone, { etapa: "compra_pagamento", dados: state.dados });
+        return sendText(telefone, "Financiado ou à vista?");
+    }
 
-        case "compra_orcamento":
-            state.dados.orcamento = msg;
-            updateState(telefone, { etapa: "compra_forma", dados: state.dados });
-            return sendText(telefone, "💳 Qual a forma de pagamento? (ex: financiamento, à vista)");
+    if (state.etapa === "compra_pagamento") {
+        state.dados.pagamento = msg;
+        updateState(telefone, { etapa: "compra_urgencia", dados: state.dados });
+        return sendText(telefone, "Urgência? (baixa/média/alta)");
+    }
 
-        case "compra_forma":
-            state.dados.forma = msg;
-            updateState(telefone, { etapa: "compra_urgencia", dados: state.dados });
-            return sendText(telefone, "⏱️ Qual o nível de urgência? (baixa, média, alta)");
+    if (state.etapa === "compra_urgencia") {
+        state.dados.urgencia = msg;
 
-        case "compra_urgencia":
-            state.dados.urgencia = msg;
+        const resumo = await gerarResumoIA("compra_imovel", state.dados, telefone);
+        await sendText(telefone, resumo);
+        await sendText(telefone, "Informações enviadas ao corretor!");
 
-            await sendText(telefone, "Gerando resumo...");
-            const resumo = await iaResumo("compra_imovel", state.dados, telefone);
-
-            await sendText(telefone, resumo);
-            await sendText(telefone, "Informações enviadas para o corretor!");
-
-            updateState(telefone, { etapa: "aguardando_corretor", dados: {} });
-            return;
+        updateState(telefone, { etapa: "aguardando_corretor" });
+        return;
     }
 };

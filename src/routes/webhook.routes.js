@@ -1,146 +1,122 @@
 const express = require("express");
 const router = express.Router();
 
-const { getState, updateState } = require("../services/state.service");
+const { getState, updateState, resetState } = require("../services/state.service");
 const { sendText } = require("../services/zapi.service");
 
+// FLOWS
 const menuFlow = require("../flows/menu.flow");
 const compraFlow = require("../flows/compra.flow");
 const aluguelFlow = require("../flows/aluguel.flow");
 const vendaFlow = require("../flows/venda.flow");
+const listFlow = require("../flows/list.flow");
 
+// =========================================
+// 🔥 WEBHOOK Z-API
+// =========================================
 router.post("/", async (req, res) => {
-  console.log("📩 RECEBIDO DO Z-API:", JSON.stringify(req.body, null, 2));
 
-  // ==================================================
-  // CAPTURA SEGURA DO TELEFONE
-  // ==================================================
-  const telefone = req.body.phone || req.body.connectedPhone;
-  if (!telefone) return res.sendStatus(200);
+    console.log("📩 RECEBIDO DO Z-API:", JSON.stringify(req.body, null, 2));
 
-  // ==================================================
-  // CAPTURA SEGURA DA MENSAGEM — CORREÇÃO CRÍTICA
-  // ==================================================
-  let msg = req.body.text?.message;
+    const telefone = req.body.phone || req.body.connectedPhone;
+    const mensagem = req.body.text?.message?.trim() || null;
 
-  // Se vier como objeto (botão, estrutura Z-API, select, etc)
-  if (typeof msg === "object" && msg !== null) {
-    msg =
-      msg.id ||
-      msg.title ||
-      msg.text ||
-      msg.value ||
-      msg.label ||
-      ""; // fallback
-  }
+    // Ignorar mensagens inválidas
+    if (!telefone || !mensagem) return res.sendStatus(200);
 
-  // Garante string limpa
-  if (typeof msg === "string") {
-    msg = msg.trim();
-  } else {
-    msg = "";
-  }
+    // Bloquear grupos
+    if (req.body.isGroup || telefone.endsWith("@g.us") || telefone.includes("-group")) {
+        console.log("⛔ Ignorado (grupo).");
+        return res.sendStatus(200);
+    }
 
-  if (!msg) return res.sendStatus(200);
+    // Carrega estado do usuário
+    let state = getState(telefone);
 
-  // ==================================================
-  // BLOQUEIO ABSOLUTO DE GRUPO
-  // ==================================================
-  if (
-    req.body.isGroup ||
-    telefone.includes("-group") ||
-    telefone.endsWith("@g.us")
-  ) {
-    console.log("⛔ Mensagem de grupo bloqueada:", telefone);
-    return res.sendStatus(200);
-  }
+    // Evitar duplicidade
+    const messageId = req.body.messageId;
+    if (state.lastMessageId === messageId) {
+        console.log("🔁 Ignorado (duplicado).");
+        return res.sendStatus(200);
+    }
+    updateState(telefone, { lastMessageId: messageId });
 
-  // ==================================================
-  // ESTADO DO USUÁRIO
-  // ==================================================
-  let state = getState(telefone);
+    const msgLower = mensagem.toLowerCase();
 
-  if (!state) {
-    state = { etapa: "menu", dados: {}, lastMessageId: null };
-    updateState(telefone, state);
+    // RESET MENU
+    if (msgLower === "menu") {
+        resetState(telefone);
+        await sendText(
+            telefone,
+            "📍 *Menu Principal*\n\n1 — Comprar imóvel\n2 — Alugar imóvel\n3 — Ver imóveis\n4 — Vender imóvel\n5 — Colocar imóvel para aluguel\n6 — Financiamentos\n0 — Falar com corretor"
+        );
+        return res.sendStatus(200);
+    }
 
+    // =========================================
+    // PRIMEIRO CONTATO → Envia menu e inicia estado
+    // =========================================
+    if (!state || !state.etapa) {
+        resetState(telefone);
+
+        await sendText(
+            telefone,
+            "📍 *Menu Principal*\n\n1 — Comprar imóvel\n2 — Alugar imóvel\n3 — Ver imóveis\n4 — Vender imóvel\n5 — Colocar imóvel para aluguel\n6 — Financiamentos\n0 — Falar com corretor"
+        );
+
+        return res.sendStatus(200);
+    }
+
+    // =========================================
+    // MENU PRINCIPAL
+    // =========================================
+    if (state.etapa === "menu") {
+        await menuFlow(telefone, mensagem, state);
+        return res.sendStatus(200);
+    }
+
+    // =========================================
+    // COMPRA
+    // =========================================
+    if (state.etapa.startsWith("compra_")) {
+        await compraFlow(telefone, mensagem, state);
+        return res.sendStatus(200);
+    }
+
+    // =========================================
+    // ALUGUEL
+    // =========================================
+    if (state.etapa.startsWith("alug_")) {
+        await aluguelFlow(telefone, mensagem, state);
+        return res.sendStatus(200);
+    }
+
+    // =========================================
+    // VENDA
+    // =========================================
+    if (state.etapa.startsWith("venda_")) {
+        await vendaFlow(telefone, mensagem, state);
+        return res.sendStatus(200);
+    }
+
+    // =========================================
+    // LISTAGEM (Ver imóveis)
+    // =========================================
+    if (state.etapa.startsWith("list_")) {
+        await listFlow(telefone, mensagem, state);
+        return res.sendStatus(200);
+    }
+
+    // =========================================
+    // FAILSAFE — volta menu
+    // =========================================
+    resetState(telefone);
     await sendText(
-      telefone,
-      "📍 *Menu Principal*\n\n1 — Comprar imóvel\n2 — Alugar imóvel\n3 — Vender imóvel"
+        telefone,
+        "📍 *Menu Principal*\n\n1 — Comprar imóvel\n2 — Alugar imóvel\n3 — Ver imóveis\n4 — Vender imóvel\n5 — Colocar imóvel para aluguel\n6 — Financiamentos\n0 — Falar com corretor"
     );
 
     return res.sendStatus(200);
-  }
-
-  // ==================================================
-  // ANTI-DUPLICIDADE
-  // ==================================================
-  const messageId = req.body.messageId;
-  if (state.lastMessageId === messageId) {
-    console.log("🔁 Mensagem duplicada ignorada");
-    return res.sendStatus(200);
-  }
-  updateState(telefone, { ...state, lastMessageId: messageId });
-
-  const msgLower = msg.toLowerCase();
-
-  // ==================================================
-  // RESET PARA MENU
-  // ==================================================
-  if (msgLower === "menu") {
-    updateState(telefone, { etapa: "menu", dados: {} });
-
-    await sendText(
-      telefone,
-      "📍 *Menu Principal*\n\n1 — Comprar imóvel\n2 — Alugar imóvel\n3 — Vender imóvel"
-    );
-
-    return res.sendStatus(200);
-  }
-
-  // ==================================================
-  // MENU
-  // ==================================================
-  if (state.etapa === "menu") {
-    await menuFlow(telefone, msg, state);
-    return res.sendStatus(200);
-  }
-
-  // ==================================================
-  // COMPRA
-  // ==================================================
-  if (state.etapa.startsWith("compra_")) {
-    await compraFlow(telefone, msg, state);
-    return res.sendStatus(200);
-  }
-
-  // ==================================================
-  // ALUGUEL
-  // ==================================================
-  if (state.etapa.startsWith("alug_")) {
-    await aluguelFlow(telefone, msg, state);
-    return res.sendStatus(200);
-  }
-
-  // ==================================================
-  // VENDA
-  // ==================================================
-  if (state.etapa.startsWith("venda_")) {
-    await vendaFlow(telefone, msg, state);
-    return res.sendStatus(200);
-  }
-
-  // ==================================================
-  // FAIL-SAFE
-  // ==================================================
-  updateState(telefone, { etapa: "menu", dados: {} });
-
-  await sendText(
-    telefone,
-    "📍 *Menu Principal*\n\n1 — Comprar imóvel\n2 — Alugar imóvel\n3 — Vender imóvel"
-  );
-
-  return res.sendStatus(200);
 });
 
 module.exports = router;

@@ -1,41 +1,41 @@
-const { sendText } = require("../services/zapi.service");
 const { updateState } = require("../services/state.service");
-const { iaResumo } = require("../services/openai.service");
+const { sendText } = require("../services/zapi.service");
+const { gerarResumoIA } = require("../services/openai.service");
 
 module.exports = async function vendaFlow(telefone, msg, state) {
 
-    switch (state.etapa) {
+    if (state.etapa === "venda_tipo") {
+        state.dados.tipo = msg;
+        updateState(telefone, { etapa: "venda_local", dados: state.dados });
+        return sendText(telefone, "Qual bairro/região?");
+    }
 
-        case "venda_tipo":
-            state.dados.tipo = msg;
-            updateState(telefone, { etapa: "venda_regiao", dados: state.dados });
-            return sendText(telefone, "📍 Em qual bairro está o imóvel?");
+    if (state.etapa === "venda_local") {
+        state.dados.local = msg;
+        updateState(telefone, { etapa: "venda_tamanho", dados: state.dados });
+        return sendText(telefone, "Tamanho (m² / quartos)?");
+    }
 
-        case "venda_regiao":
-            state.dados.regiao = msg;
-            updateState(telefone, { etapa: "venda_tamanho", dados: state.dados });
-            return sendText(telefone, "📐 Quantos quartos / tamanho do imóvel?");
+    if (state.etapa === "venda_tamanho") {
+        state.dados.tamanho = msg;
+        updateState(telefone, { etapa: "venda_estado", dados: state.dados });
+        return sendText(telefone, "Estado de conservação?");
+    }
 
-        case "venda_tamanho":
-            state.dados.tamanho = msg;
-            updateState(telefone, { etapa: "venda_estado", dados: state.dados });
-            return sendText(telefone, "🛠️ Estado do imóvel? (novo, reformado, precisa de reforma)");
+    if (state.etapa === "venda_estado") {
+        state.dados.estado = msg;
+        updateState(telefone, { etapa: "venda_valor", dados: state.dados });
+        return sendText(telefone, "Valor desejado?");
+    }
 
-        case "venda_estado":
-            state.dados.estado = msg;
-            updateState(telefone, { etapa: "venda_valor", dados: state.dados });
-            return sendText(telefone, "💵 Qual o valor desejado na venda?");
+    if (state.etapa === "venda_valor") {
+        state.dados.valor = msg;
 
-        case "venda_valor":
-            state.dados.valor = msg;
+        const resumo = await gerarResumoIA("venda_imovel", state.dados, telefone);
+        await sendText(telefone, resumo);
+        await sendText(telefone, "Informações enviadas ao corretor!");
 
-            await sendText(telefone, "Gerando resumo...");
-            const resumo = await iaResumo("venda_imovel", state.dados, telefone);
-
-            await sendText(telefone, resumo);
-            await sendText(telefone, "Informações enviadas ao corretor!");
-
-            updateState(telefone, { etapa: "aguardando_corretor", dados: {} });
-            return;
+        updateState(telefone, { etapa: "aguardando_corretor" });
+        return;
     }
 };
