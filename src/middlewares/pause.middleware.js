@@ -13,7 +13,7 @@ async function pauseMiddleware(req, res, next) {
 
     next();
   } catch (err) {
-    console.log("Erro no pauseMiddleware:", err);
+    console.log("pauseMiddleware erro:", err);
     next();
   }
 }

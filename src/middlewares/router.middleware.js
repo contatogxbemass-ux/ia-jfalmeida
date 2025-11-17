@@ -14,21 +14,17 @@ async function routerMiddleware(req, res, next) {
 
     if (!phone || !msg) return next();
 
-    // Puxa sessão atual
     const session = await getSession(phone);
 
-    // Todas as mensagens respondidas pelo bot ficam aqui
     const replies = [];
 
-    // Define o contexto que cada flow usa
     const ctx = {
       from: phone,
       message: msg,
 
-      // Quando um flow chamar ctx.send(), a mensagem vai para o ZAPI real
       async send(text) {
         replies.push(text);
-        await sendText(phone, text); // <<< AQUI ESTÁ A MAGIA
+        await sendText(phone, text); // ENVIA direto no WhatsApp
       },
 
       async setState(data) {
@@ -36,10 +32,9 @@ async function routerMiddleware(req, res, next) {
       }
     };
 
-    // Roteamento baseado na etapa
     switch (session.etapa) {
       case "menu":
-        await menuFlow(ctx);  
+        await menuFlow(ctx);
         break;
       case "compra":
         await compraFlow(ctx);
@@ -58,9 +53,7 @@ async function routerMiddleware(req, res, next) {
         break;
     }
 
-    // Render recebe apenas confirmação
     return res.json({ ok: true, replies });
-
   } catch (err) {
     console.log("Erro no routerMiddleware:", err);
     return res.json({ ok: false });
