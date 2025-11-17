@@ -35,28 +35,55 @@ router.post("/", async (req, res) => {
 
   // Cria novo estado se não existir
   if (!state) {
-    state = { etapa: "menu", dados: {}, lastMessageId: null };
+    state = { etapa: "menu", dados: {}, lastMessageId: null, silencio: false, paused: false };
     updateState(telefone, state);
 
     await sendText(telefone, menuPrincipal());
     return res.sendStatus(200);
   }
 
-  // Anti duplicidade
   const messageId = req.body.messageId;
+
+  // Anti duplicidade
   if (state.lastMessageId === messageId) return res.sendStatus(200);
   updateState(telefone, { ...state, lastMessageId: messageId });
 
   const msgLower = msg.toLowerCase();
 
-  // Reset de menu
+  // ======================================================
+  // 🔥 COMANDOS GLOBAIS /pausar e /voltar
+  // ======================================================
+
+  if (msgLower === "/pausar") {
+    updateState(telefone, { paused: true });
+    await sendText(telefone, "⏸️ Bot pausado. Digite /voltar para continuar.");
+    return res.sendStatus(200);
+  }
+
+  if (msgLower === "/voltar") {
+    updateState(telefone, { paused: false });
+    await sendText(telefone, "▶️ Bot retomado.");
+    return res.sendStatus(200);
+  }
+
+  // Bloqueia qualquer ação enquanto estiver pausado
+  if (state.paused) {
+    await sendText(telefone, "Bot pausado. Digite /voltar para continuar.");
+    return res.sendStatus(200);
+  }
+
+  // ======================================================
+  // 🔥 RESET DE MENU
+  // ======================================================
   if (msgLower === "menu") {
     updateState(telefone, { etapa: "menu", dados: {} });
     await sendText(telefone, menuPrincipal());
     return res.sendStatus(200);
   }
 
-  // MENU
+  // ======================================================
+  // 🔥 MENU
+  // ======================================================
   if (state.etapa === "menu") {
     await menuFlow(telefone, msg, state);
     return res.sendStatus(200);

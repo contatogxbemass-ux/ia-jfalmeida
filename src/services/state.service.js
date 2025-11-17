@@ -12,7 +12,8 @@ function getState(telefone) {
             etapa: "menu",
             dados: {},
             lastMessageId: null,
-            silencio: false
+            silencio: false,
+            paused: false
         };
     }
     return estados[telefone];
@@ -34,7 +35,8 @@ function resetState(telefone) {
         etapa: "menu",
         dados: {},
         lastMessageId: null,
-        silencio: false
+        silencio: false,
+        paused: false
     };
 }
 
