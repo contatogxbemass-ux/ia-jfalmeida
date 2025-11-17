@@ -1,41 +1,24 @@
-const menuFlow = require("../flows/menu.flow");
-const compraFlow = require("../flows/compra.flow");
-const aluguelFlow = require("../flows/aluguel.flow");
-const vendaFlow = require("../flows/venda.flow");
-const { showMainMenu } = require("../utils/menu.util");
+// src/middlewares/router.middleware.js
 
-module.exports = async (ctx, next) => {
-  const msg = ctx.body?.trim();
-  const state = ctx.state || {};
+import { getAsync } from "../services/redis.service.js";
 
-  // Se não existe etapa → inicia no menu imediatamente
-  if (!state.etapa) {
-    await ctx.setState({ etapa: "menu" });
-    await ctx.send(showMainMenu());
-    return;
+export const routerMiddleware = async (ctx, next) => {
+  try {
+    const user = ctx.from;
+
+    // Verifica se o usuário está pausado
+    const isPaused = await getAsync(`pause:${user}`);
+
+    // SE ESTIVER PAUSADO → silêncio total, sem enviar NADA.
+    if (isPaused === "true") {
+      return; // não chama next(), não envia mensagem
+    }
+
+    // Se não estiver pausado, segue o fluxo normal
+    return next();
+
+  } catch (err) {
+    console.error("Erro no routerMiddleware:", err);
+    return next();
   }
-
-  // MENU
-  if (state.etapa === "menu") {
-    return menuFlow(ctx.from, msg, state, ctx);
-  }
-
-  // COMPRA
-  if (state.etapa.startsWith("compra_")) {
-    return compraFlow(ctx.from, msg, state, ctx);
-  }
-
-  // ALUGUEL
-  if (state.etapa.startsWith("aluguel_")) {
-    return aluguelFlow(ctx.from, msg, state, ctx);
-  }
-
-  // VENDA
-  if (state.etapa.startsWith("venda_")) {
-    return vendaFlow(ctx.from, msg, state, ctx);
-  }
-
-  // QUALQUER OUTRA COISA → VOLTA PRO MENU
-  await ctx.setState({ etapa: "menu" });
-  await ctx.send(showMainMenu());
 };
