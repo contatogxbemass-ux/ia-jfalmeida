@@ -1,22 +1,14 @@
-// src/middlewares/pause.middleware.js
+import pkg from "../services/redis.service.js";
+const { getAsync } = pkg;
 
-import { getAsync } from "../services/redis.service.js";
+const pauseMiddleware = async (ctx, next) => {
+  const user = await getAsync(ctx.from);
 
-export const pauseMiddleware = async (ctx, next) => {
-  try {
-    const phone = ctx.from;
-    const isPaused = await getAsync(`pause:${phone}`);
-
-    // Se o usuário está pausado → silêncio total
-    if (isPaused === "true") {
-      return;
-    }
-
-    // Senão → segue fluxo normal
-    return next();
-
-  } catch (error) {
-    console.error("Erro no pauseMiddleware:", error);
-    return next();
+  if (user?.paused) {
+    return; // não responde NADA
   }
+
+  next();
 };
+
+export default pauseMiddleware;

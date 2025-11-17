@@ -1,6 +1,6 @@
-module.exports = async function loggerMiddleware(ctx, next) {
-  console.log(
-    `👤 ${ctx.phone} | etapa: ${ctx.state.etapa} | msg: "${ctx.msg}"`
-  );
-  return next();
+const loggerMiddleware = async (ctx, next) => {
+  console.log("📩 RECEBIDO DO Z-API:", JSON.stringify(ctx.update, null, 2));
+  await next();
 };
+
+export default loggerMiddleware;

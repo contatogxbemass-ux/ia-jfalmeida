@@ -1,26 +1,24 @@
-// src/middlewares/commands.middleware.js
+import pkg from "../services/redis.service.js";
+const { setAsync, delAsync } = pkg;
 
-import { setAsync, delAsync } from "../services/redis.service.js";
+const commandsMiddleware = async (ctx, next) => {
+  const msg = ctx.body?.message?.trim();
 
-export const commandsMiddleware = async (ctx, next) => {
-  const body = ctx.body?.trim().toLowerCase();
-  const phone = ctx.from;
+  if (!msg) return next();
 
-  if (!body) return next();
-
-  // PAUSAR BOT
-  if (body === "/pausar") {
-    await setAsync(`pause:${phone}`, "true");
-    await ctx.send("⏸️ Bot pausado.");
+  if (msg === "/pausar") {
+    await setAsync(ctx.from, { paused: true });
+    await ctx.send("⏸️ Bot pausado. Digite /voltar para continuar.");
     return;
   }
 
-  // RETOMAR BOT
-  if (body === "/voltar") {
-    await delAsync(`pause:${phone}`);
+  if (msg === "/voltar") {
+    await delAsync(ctx.from);
     await ctx.send("▶️ Bot retomado.");
     return;
   }
 
-  return next();
+  next();
 };
+
+export default commandsMiddleware;
