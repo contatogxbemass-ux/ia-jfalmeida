@@ -2,7 +2,7 @@ const { sendMessage } = require("../services/zapi.service");
 const { updateState } = require("../services/state.service");
 const { iaResumo } = require("../services/openai.service");
 
-module.exports = async function aluguelClienteFlow(telefone, msg, state) {
+module.exports = async function aluguelFlow(telefone, msg, state) {
 
     switch (state.etapa) {
 

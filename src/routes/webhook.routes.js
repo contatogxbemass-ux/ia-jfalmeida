@@ -1,156 +1,125 @@
 const express = require("express");
 const router = express.Router();
 
-const { initState, getState, updateState } = require("../services/state.service");
-const { sendMessage } = require("../services/zapi.service");
-const { menuPrincipalFlow } = require("../flows/menu.flow");
+const { getState, updateState } = require("../services/state.service");
+const { sendMessage, sendButtons } = require("../services/zapi.service");
+const { iaResumo } = require("../services/openai.service");
 
+// FLOWS QUE EXISTEM NO SEU PROJETO
+const menuFlow = require("../flows/menu.flow");
 const compraFlow = require("../flows/compra.flow");
+const aluguelFlow = require("../flows/aluguel.flow");
 const vendaFlow = require("../flows/venda.flow");
-const alugClienteFlow = require("../flows/alug_cliente.flow");
-const alugPropFlow = require("../flows/alug_prop.flow");
 
-
-// ======================================================
-// 🔥 WEBHOOK Z-API COMPLETO (VERSÃO FINAL)
-// ======================================================
+// =========================
+// WEBHOOK ISOLADO
+// =========================
 router.post("/webhook", async (req, res) => {
-  console.log("📩 RECEBIDO DO Z-API:", JSON.stringify(req.body, null, 2));
+  try {
+    const body = req.body;
+    const telefone = body.phone;
+    const texto = body?.text?.message || null;
+    const buttonId = body?.buttonResponse?.id || null;
 
-  // -----------------------
-  // TELEFONE
-  // -----------------------
-  const phone = req.body.phone || req.body.connectedPhone;
-
-  // -----------------------
-  // BLOQUEIO TOTAL DE GRUPOS
-  // -----------------------
-  if (
-    req.body.isGroup === true ||
-    (phone && phone.includes("-group")) ||
-    (phone && phone.endsWith("@g.us"))
-  ) {
-    console.log("⛔ BLOQUEADO: Mensagem de grupo ignorada.");
-    return res.sendStatus(200);
-  }
-
-  // -----------------------
-  // TEXTO NORMAL
-  // -----------------------
-  const texto = req.body?.text?.message || "";
-  const msg = texto.trim();
-  const lower = msg.toLowerCase();
-
-  // -----------------------
-  // INICIALIZA ESTADO
-  // -----------------------
-  let state = getState(phone);
-  if (!state) state = initState(phone);
-
-  // -----------------------
-  // ANTI-DUPLICIDADE
-  // -----------------------
-  const messageId = req.body.messageId;
-  if (state.lastMessageId === messageId) {
-    return res.sendStatus(200);
-  }
-  updateState(phone, { lastMessageId: messageId });
-
-  // ======================================================
-  // 🔥 BOTÃO PRESSIONADO (NÚMEROS 1–5 e 0)
-  // ======================================================
-  const buttonId = req.body.buttonResponse && req.body.buttonResponse.id;
-
-  if (buttonId) {
-    console.log("🔘 BOTÃO PRESSIONADO:", buttonId);
-
-    switch (buttonId) {
-      case "1":
-        updateState(phone, { etapa: "compra_tipo", dados: {} });
-        await sendMessage(phone, "Qual tipo de imóvel deseja comprar?");
-        return res.sendStatus(200);
-
-      case "2":
-        updateState(phone, { etapa: "alug_cliente_tipo", dados: {} });
-        await sendMessage(phone, "Qual tipo de imóvel deseja alugar?");
-        return res.sendStatus(200);
-
-      case "3":
-        updateState(phone, { etapa: "list_tipo", dados: {} });
-        await sendMessage(phone, "Qual tipo de imóvel deseja ver?");
-        return res.sendStatus(200);
-
-      case "4":
-        updateState(phone, { etapa: "venda_tipo", dados: {} });
-        await sendMessage(phone, "Qual tipo de imóvel deseja vender?");
-        return res.sendStatus(200);
-
-      case "5":
-        updateState(phone, { etapa: "alug_prop_tipo", dados: {} });
-        await sendMessage(phone, "Qual tipo de imóvel deseja colocar para aluguel?");
-        return res.sendStatus(200);
-
-      case "0":
-        updateState(phone, { etapa: "aguardando_corretor", dados: {} });
-        await sendMessage(phone, "Perfeito! Um corretor humano irá te chamar em instantes.");
-        return res.sendStatus(200);
+    // Bloqueio total de grupos
+    if (body.isGroup || telefone.includes("-group") || telefone.endsWith("@g.us")) {
+      console.log("⛔ BLOQUEADO: grupo detectado");
+      return res.sendStatus(200);
     }
-  }
 
-  // ======================================================
-  // 🔥 COMANDO GLOBAL "menu"
-  // ======================================================
-  if (lower === "menu") {
-    updateState(phone, { etapa: "menu", dados: {} });
-    await menuPrincipalFlow(phone);
+    // Ignorar mensagens sem texto
+    if (!texto && !buttonId) return res.sendStatus(200);
+
+    // Estado do usuário
+    let state = getState(telefone);
+
+    // ============================
+    // BOTÃO PRESSIONADO
+    // ============================
+    if (buttonId) {
+      console.log("🔘 BOTÃO:", buttonId);
+
+      switch (buttonId) {
+        case "1":
+          updateState(telefone, { etapa: "compra_tipo", dados: {} });
+          await sendMessage(telefone, "Qual tipo de imóvel deseja comprar?");
+          return res.sendStatus(200);
+
+        case "2":
+          updateState(telefone, { etapa: "alug_cliente_tipo", dados: {} });
+          await sendMessage(telefone, "Qual tipo de imóvel deseja alugar?");
+          return res.sendStatus(200);
+
+        case "3":
+          updateState(telefone, { etapa: "lista_tipo", dados: {} });
+          await sendMessage(telefone, "Qual tipo de imóvel deseja ver?");
+          return res.sendStatus(200);
+
+        case "4":
+          updateState(telefone, { etapa: "venda_tipo", dados: {} });
+          await sendMessage(telefone, "Qual tipo de imóvel deseja vender?");
+          return res.sendStatus(200);
+
+        case "5":
+          // Você AINDA NÃO TEM fluxo de aluguel do proprietário
+          await sendMessage(telefone, "Fluxo de proprietário ainda não disponível.");
+          return res.sendStatus(200);
+
+        case "0":
+          updateState(telefone, { etapa: "aguardando_corretor", dados: {} });
+          await sendMessage(
+            telefone,
+            "Perfeito! Um corretor humano irá te chamar em instantes."
+          );
+          return res.sendStatus(200);
+      }
+    }
+
+    // Texto normal enviado
+    const msg = texto.trim().toLowerCase();
+
+    // Reset para MENU
+    if (msg === "menu") {
+      updateState(telefone, { etapa: "menu", dados: {} });
+      await menuFlow(telefone);
+      return res.sendStatus(200);
+    }
+
+    // EXECUTAR O FLUXO CORRETO
+    switch (state.etapa) {
+      case "menu":
+        return menuFlow(telefone);
+
+      case "compra_tipo":
+      case "compra_regiao":
+      case "compra_orcamento":
+      case "compra_pagamento":
+      case "compra_urgencia":
+        return compraFlow(telefone, texto, state);
+
+      case "alug_cliente_tipo":
+      case "alug_cliente_regiao":
+      case "alug_cliente_orcamento":
+      case "alug_cliente_quartos":
+      case "alug_cliente_data":
+      case "alug_cliente_finalidade":
+        return aluguelFlow(telefone, texto, state);
+
+      case "venda_tipo":
+      case "venda_local":
+      case "venda_tamanho":
+      case "venda_estado":
+      case "venda_valor":
+        return vendaFlow(telefone, texto, state);
+
+      default:
+        updateState(telefone, { etapa: "menu", dados: {} });
+        return menuFlow(telefone);
+    }
+  } catch (err) {
+    console.error("ERRO NO WEBHOOK:", err);
     return res.sendStatus(200);
   }
-
-  // ======================================================
-  // 🔥 Direcionar para o fluxo certo
-  // ======================================================
-
-  // MENU PRINCIPAL
-  if (state.etapa === "menu") {
-    await menuPrincipalFlow(phone);
-    return res.sendStatus(200);
-  }
-
-  // COMPRA
-  if (state.etapa.startsWith("compra_")) {
-    await compraFlow(phone, msg, state);
-    return res.sendStatus(200);
-  }
-
-  // VENDA
-  if (state.etapa.startsWith("venda_")) {
-    await vendaFlow(phone, msg, state);
-    return res.sendStatus(200);
-  }
-
-  // ALUGAR CLIENTE
-  if (state.etapa.startsWith("alug_cliente_")) {
-    await alugClienteFlow(phone, msg, state);
-    return res.sendStatus(200);
-  }
-
-  // ALUGAR PROPRIETÁRIO
-  if (state.etapa.startsWith("alug_prop_")) {
-    await alugPropFlow(phone, msg, state);
-    return res.sendStatus(200);
-  }
-
-  // ======================================================
-  // 🔥 Se cair aqui, reseta para o menu
-  // ======================================================
-  await sendMessage(phone, "Não entendi sua mensagem. Digite *menu*.");
-  updateState(phone, { etapa: "menu", dados: {} });
-
-  return res.sendStatus(200);
 });
 
-
-// ======================================================
-// EXPORTAÇÃO
-// ======================================================
 module.exports = router;
