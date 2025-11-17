@@ -1,31 +1,54 @@
 const { updateState } = require("../services/state.service");
 const { sendText } = require("../services/zapi.service");
 
-module.exports = async function menuFlow(phone, msg, state) {
-    const op = msg.trim();
+module.exports = async function menuFlow(telefone, msg, state) {
 
-    switch (op) {
-        case "1":
-            updateState(phone, { etapa: "compra_tipo", dados: {} });
-            return sendText(phone, "Ótimo! Qual *tipo de imóvel* você procura?");
-        
-        case "2":
-            updateState(phone, { etapa: "alug_cliente_tipo", dados: {} });
-            return sendText(phone, "Perfeito! Qual *tipo de imóvel* você quer alugar?");
-        
-        case "3":
-            updateState(phone, { etapa: "venda_tipo", dados: {} });
-            return sendText(phone, "Certo! Qual *tipo de imóvel* você quer vender?");
-        
-        case "4":
-            updateState(phone, { etapa: "alug_prop_tipo", dados: {} });
-            return sendText(phone, "Qual *tipo de imóvel* quer colocar para aluguel?");
-        
-        case "0":
-            updateState(phone, { etapa: "aguardando_corretor" });
-            return sendText(phone, "Certo! Encaminhando você para um corretor humano.");
-        
-        default:
-            return sendText(phone, "Opção inválida. Digite uma opção do menu.");
+    const op = msg.trim(); // mensagem enviada
+
+    // ======================
+    // OPÇÃO 1 — Comprar
+    // ======================
+    if (op === "1") {
+        updateState(telefone, { etapa: "compra_tipo", dados: {} });
+
+        await sendText(
+            telefone,
+            "Ótimo! Qual *tipo de imóvel* você procura?\n\nApartamento\nCasa\nSobrado"
+        );
+        return;
     }
+
+    // ======================
+    // OPÇÃO 2 — Alugar
+    // ======================
+    if (op === "2") {
+        updateState(telefone, { etapa: "alug_cliente_tipo", dados: {} });
+
+        await sendText(
+            telefone,
+            "Perfeito! Qual *tipo de imóvel* você deseja alugar?\n\nApartamento\nCasa\nKitnet"
+        );
+        return;
+    }
+
+    // ======================
+    // OPÇÃO 3 — Vender
+    // ======================
+    if (op === "3") {
+        updateState(telefone, { etapa: "venda_tipo", dados: {} });
+
+        await sendText(
+            telefone,
+            "Vamos lá! Qual *tipo de imóvel* você deseja vender?\n\nApartamento\nCasa\nSobrado"
+        );
+        return;
+    }
+
+    // ======================
+    // OPÇÃO INVÁLIDA
+    // ======================
+    await sendText(
+        telefone,
+        "Opção inválida. Digite uma opção do menu."
+    );
 };
