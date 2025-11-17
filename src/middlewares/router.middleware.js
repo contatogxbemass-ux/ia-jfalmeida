@@ -15,12 +15,12 @@ module.exports = async (ctx, next) => {
     return;
   }
 
-  // Se está no menu
+  // Menu
   if (state.etapa === "menu") {
     return menuFlow(ctx.from, msg, state, ctx);
   }
 
-  // Rotas por fluxo
+  // Fluxos
   if (state.etapa.startsWith("compra_")) {
     return compraFlow(ctx.from, msg, state, ctx);
   }
@@ -33,7 +33,7 @@ module.exports = async (ctx, next) => {
     return vendaFlow(ctx.from, msg, state, ctx);
   }
 
-  // QUALQUER COISA FORA DO FLUXO → VOLTA PARA O MENU SEM MENSAGEM
+  // Qualquer coisa fora → volta pro menu
   await ctx.setState({ etapa: "menu" });
   await ctx.send(showMainMenu());
 };

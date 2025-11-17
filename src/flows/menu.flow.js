@@ -1,68 +1,38 @@
 const { showMainMenu } = require("../utils/menu.util");
 
-module.exports = async function menuFlow(phone, msg, state, ctx) {
-  const option = msg.trim();
+module.exports = async function menuFlow(from, msg, state, ctx) {
+  msg = msg.trim();
 
-  // MENU PRINCIPAL
-  if (!state.etapa || state.etapa === "menu") {
-    if (option === "1") {
-      await ctx.setState({
-        etapa: "compra_inicio",
-        fluxo: "Compra",
-        telefone: phone,
-        dados: {}
-      });
-
-      await ctx.send("Perfeito! Vamos começar seu atendimento de COMPRA.\nQual cidade deseja?");
-      return;
-    }
-
-    if (option === "2") {
-      await ctx.setState({
-        etapa: "aluguel_inicio",
-        fluxo: "Aluguel",
-        telefone: phone,
-        dados: {}
-      });
-
-      await ctx.send("Vamos iniciar seu atendimento de ALUGUEL.\nQual cidade deseja?");
-      return;
-    }
-
-    if (option === "4") {
-      await ctx.setState({
-        etapa: "venda_inicio",
-        fluxo: "Venda",
-        telefone: phone,
-        dados: {}
-      });
-
-      await ctx.send("Vamos começar a AVALIAÇÃO DE VENDA.\nInforme a cidade:");
-      return;
-    }
-
-    if (option === "5") {
-      await ctx.setState({
-        etapa: "alugar_proprietario_inicio",
-        fluxo: "Alugar - Proprietário",
-        telefone: phone,
-        dados: {}
-      });
-
-      await ctx.send("Vamos anunciar seu imóvel para ALUGAR.\nQual cidade?");
-      return;
-    }
-
-    if (option === "0") {
-      await ctx.setState({ etapa: "humano", fluxo: "Humano", telefone: phone });
-      await ctx.send("Encaminhando para um corretor...\nAguarde alguns instantes.");
-      return;
-    }
-
-    await ctx.send("Opção inválida.\n\n" + showMainMenu());
-    return;
+  // Forçando entrada do menu quando usuário digita "menu"
+  if (msg.toLowerCase() === "menu") {
+    await ctx.setState({ etapa: "menu" });
+    return ctx.send(showMainMenu());
   }
 
-  // FALLBACK (qualquer etapa inválida volta ao menu)
-  await ctx.send(showMainMenu());
+  switch (msg) {
+    case "1":
+      await ctx.setState({ etapa: "compra_inicio" });
+      return ctx.send("Perfeito! Vamos iniciar o atendimento de compra.\n\nQual cidade você procura o imóvel?");
+
+    case "2":
+      await ctx.setState({ etapa: "aluguel_inicio" });
+      return ctx.send("Ótimo! Vamos iniciar o atendimento de aluguel.\n\nQual cidade você procura o imóvel?");
+
+    case "4":
+      await ctx.setState({ etapa: "venda_inicio" });
+      return ctx.send("Vamos avaliar seu imóvel para venda.\n\nQual o endereço do imóvel?");
+
+    case "5":
+      await ctx.setState({ etapa: "venda_inicio" });
+      return ctx.send("Vamos iniciar o processo de colocar o imóvel para aluguel.\n\nQual o endereço do imóvel?");
+
+    case "0":
+      await ctx.setState({ etapa: "humano" });
+      return ctx.send("Certo! Encaminhando você para um corretor humano.");
+
+    default:
+      // Usuário mandou algo fora do menu → volta ao menu, sem erro
+      await ctx.setState({ etapa: "menu" });
+      return ctx.send(showMainMenu());
+  }
 };
