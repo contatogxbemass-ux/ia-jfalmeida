@@ -1,13 +1,15 @@
-import aluguelFlow from "../flows/aluguel.flow.js";
+import menuFlow from "../flows/menu.flow.js";
 import compraFlow from "../flows/compra.flow.js";
+import aluguelFlow from "../flows/aluguel.flow.js";
 import vendaFlow from "../flows/venda.flow.js";
 import listFlow from "../flows/list.flow.js";
-import menuFlow from "../flows/menu.flow.js";
 
 const routerMiddleware = async (ctx, next) => {
   const state = ctx.state;
 
-  if (!state || !state.etapa) return menuFlow(ctx);
+  if (!state || !state.etapa) {
+    return menuFlow(ctx);
+  }
 
   switch (state.etapa) {
     case "menu": return menuFlow(ctx);

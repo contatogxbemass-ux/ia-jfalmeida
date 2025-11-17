@@ -1,14 +1,10 @@
-import pkg from "../services/redis.service.js";
-const { getAsync } = pkg;
+import redis from "../services/redis.service.js";
+const { getAsync } = redis;
 
 const pauseMiddleware = async (ctx, next) => {
-  const user = await getAsync(ctx.from);
-
-  if (user?.paused) {
-    return; // não responde NADA
-  }
-
-  next();
+  const paused = await getAsync(`paused:${ctx.from}`);
+  if (paused) return; // silêncio TOTAL
+  return next();
 };
 
 export default pauseMiddleware;

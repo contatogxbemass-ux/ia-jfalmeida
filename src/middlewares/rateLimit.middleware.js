@@ -1,5 +1,5 @@
 const rateLimitMiddleware = async (ctx, next) => {
-  next(); // simplificado pra não atrapalhar sua madrugada
+  return next();
 };
 
 export default rateLimitMiddleware;

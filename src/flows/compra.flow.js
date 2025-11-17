@@ -1,59 +1,19 @@
-const { sendText } = require("../services/zapi.service");
-const { updateSession } = require("../services/redis.service");
-const { gerarResumoIA } = require("../services/openai.service");
+import { updateSession } from "../services/redis.service.js";
 
-module.exports = async function compraFlow(telefone, msg, state) {
-  state.dados = state.dados || {};
+const compraFlow = async (ctx) => {
+  const msg = ctx.message?.trim();
 
-  switch (state.etapa) {
-    case "compra_tipo":
-      state.dados.tipo = msg;
-      await updateSession(telefone, {
-        etapa: "compra_regiao",
-        dados: state.dados,
-      });
-      return sendText(telefone, "Qual *bairro/região* você prefere?");
-
-    case "compra_regiao":
-      state.dados.regiao = msg;
-      await updateSession(telefone, {
-        etapa: "compra_orcamento",
-        dados: state.dados,
-      });
-      return sendText(telefone, "Qual seu *orçamento máximo*?");
-
-    case "compra_orcamento":
-      state.dados.orcamento = msg;
-      await updateSession(telefone, {
-        etapa: "compra_pagamento",
-        dados: state.dados,
-      });
-      return sendText(
-        telefone,
-        "A compra será *financiada ou à vista*?"
-      );
-
-    case "compra_pagamento":
-      state.dados.pagamento = msg;
-      await updateSession(telefone, {
-        etapa: "compra_urgencia",
-        dados: state.dados,
-      });
-      return sendText(
-        telefone,
-        "Qual sua *urgência*? (baixa/média/alta)"
-      );
-
-    case "compra_urgencia":
-      state.dados.urgencia = msg;
-
-      await sendText(telefone, "Gerando resumo para o corretor...");
-      const resumo = await gerarResumoIA("compra", state.dados, telefone);
-
-      await sendText(telefone, resumo);
-      await sendText(telefone, "Informações enviadas ao corretor!");
-
-      await updateSession(telefone, { etapa: "aguardando_corretor", dados: {} });
-      return;
+  if (!msg) {
+    return ctx.send("Por favor, envie o tipo de imóvel que deseja comprar.");
   }
+
+  if (msg.toLowerCase() === "menu") {
+    await updateSession(ctx.from, { etapa: "menu" });
+    return ctx.send("Retornando ao menu...");
+  }
+
+  await ctx.send(`Perfeito! Você está buscando compra: ${msg}.`);
+  return ctx.send("Um corretor entrará em contato em breve.");
 };
+
+export default compraFlow;

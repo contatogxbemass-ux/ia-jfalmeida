@@ -1,57 +1,45 @@
-const express = require("express");
+import express from "express";
+import { getSession, updateSession, resetSession } from "../services/redis.service.js";
+import { sendText } from "../services/zapi.service.js";
+
+import menuFlow from "../flows/menu.flow.js";
+import compraFlow from "../flows/compra.flow.js";
+import aluguelFlow from "../flows/aluguel.flow.js";
+import vendaFlow from "../flows/venda.flow.js";
+import listFlow from "../flows/list.flow.js";
+
+import showMainMenu from "../utils/menu.util.js";
+
 const router = express.Router();
 
-const { getSession, updateSession, resetSession } = require("../services/redis.service");
-const { sendText } = require("../services/zapi.service");
-
-const menuFlow = require("../flows/menu.flow");
-const compraFlow = require("../flows/compra.flow");
-const aluguelFlow = require("../flows/aluguel.flow");
-const vendaFlow = require("../flows/venda.flow");
-
-const { showMainMenu } = require("../utils/menu.util");
-
 // ======================================================
-// 🔥 WEBHOOK PRINCIPAL (VERSÃO REDIS / JF ALMEIDA)
+// 🔥 WEBHOOK PRINCIPAL
 // ======================================================
 router.post("/", async (req, res) => {
   console.log("📩 RECEBIDO DO Z-API:", JSON.stringify(req.body, null, 2));
 
   const telefone = req.body.phone || req.body.connectedPhone;
-  const msg = req.body.text?.message?.trim() || null;
+  const messageId = req.body.messageId;
+  const msg = req.body.text?.message?.trim() || "";
 
   if (!telefone || !msg) return res.sendStatus(200);
 
-  // Bloqueio de grupos
-  if (
-    req.body.isGroup ||
-    telefone.includes("-group") ||
-    telefone.endsWith("@g.us")
-  ) {
-    console.log("⛔ Mensagem de grupo bloqueada");
+  if (req.body.isGroup || telefone.includes("-group")) {
     return res.sendStatus(200);
   }
 
-  // Carrega sessão
   let state = await getSession(telefone);
 
-  // Anti-duplicidade
-  const messageId = req.body.messageId;
-  if (state.lastMessageId === messageId) return res.sendStatus(200);
+  // Anti duplicidade
+  if (state?.lastMessageId === messageId) return res.sendStatus(200);
+
   state = await updateSession(telefone, { lastMessageId: messageId });
 
   const msgLower = msg.toLowerCase();
 
-  // ======================================================
-  // 🔥 COMANDOS GLOBAIS
-  // ======================================================
-
+  // COMANDOS
   if (msgLower === "/pausar") {
     await updateSession(telefone, { paused: true });
-    await sendText(
-      telefone,
-      "⏸️ Bot pausado. Digite /voltar para continuar."
-    );
     return res.sendStatus(200);
   }
 
@@ -61,55 +49,71 @@ router.post("/", async (req, res) => {
     return res.sendStatus(200);
   }
 
-  if (msgLower === "menu" || msgLower === "/menu") {
+  if (state.paused) return res.sendStatus(200);
+
+  if (msgLower === "menu") {
     await resetSession(telefone);
     await sendText(telefone, showMainMenu());
     return res.sendStatus(200);
   }
 
-  // Se estiver pausado, bloqueia tudo
-  if (state.paused) {
-    await sendText(
-      telefone,
-      "⏸️ Bot pausado. Digite /voltar para continuar."
-    );
-    return res.sendStatus(200);
-  }
-
-  // ======================================================
-  // 🔥 MENU
-  // ======================================================
+  // MENU
   if (state.etapa === "menu") {
-    await menuFlow(telefone, msg, state);
+    await menuFlow({
+      from: telefone,
+      message: msg,
+      send: (text) => sendText(telefone, text),
+      setState: (data) => updateSession(telefone, data),
+    });
     return res.sendStatus(200);
   }
 
-  // ======================================================
-  // 🔥 FLUXOS
-  // ======================================================
-
-  if (state.etapa.startsWith("compra_")) {
-    await compraFlow(telefone, msg, state);
+  // FLUXOS
+  if (state.etapa === "compra") {
+    await compraFlow({
+      from: telefone,
+      message: msg,
+      send: (text) => sendText(telefone, text),
+      setState: (data) => updateSession(telefone, data),
+    });
     return res.sendStatus(200);
   }
 
-  if (state.etapa.startsWith("alug_")) {
-    await aluguelFlow(telefone, msg, state);
+  if (state.etapa === "aluguel") {
+    await aluguelFlow({
+      from: telefone,
+      message: msg,
+      send: (text) => sendText(telefone, text),
+      setState: (data) => updateSession(telefone, data),
+    });
     return res.sendStatus(200);
   }
 
-  if (state.etapa.startsWith("venda_")) {
-    await vendaFlow(telefone, msg, state);
+  if (state.etapa === "venda") {
+    await vendaFlow({
+      from: telefone,
+      message: msg,
+      send: (text) => sendText(telefone, text),
+      setState: (data) => updateSession(telefone, data),
+    });
     return res.sendStatus(200);
   }
 
-  // ======================================================
-  // 🔥 FAIL SAFE
-  // ======================================================
+  if (state.etapa === "lista") {
+    await listFlow({
+      from: telefone,
+      message: msg,
+      send: (text) => sendText(telefone, text),
+      setState: (data) => updateSession(telefone, data),
+    });
+    return res.sendStatus(200);
+  }
+
+  // FAILSAFE
   await sendText(telefone, "Não entendi. Digite *menu*.");
   await resetSession(telefone);
 
   return res.sendStatus(200);
 });
 
-module.exports = router;
+export default router;

@@ -1,58 +1,18 @@
-const { updateSession } = require("../services/redis.service");
-const { sendText } = require("../services/zapi.service");
-const { gerarResumoIA } = require("../services/openai.service");
+import { updateSession } from "../services/redis.service.js";
 
-module.exports = async function listFlow(telefone, msg, state) {
-  state.dados = state.dados || {};
+const listFlow = async (ctx) => {
+  const msg = ctx.message?.trim();
 
-  if (state.etapa === "list_tipo") {
-    state.dados.tipo = msg;
-    await updateSession(telefone, {
-      etapa: "list_regiao",
-      dados: state.dados,
-    });
-    return sendText(telefone, "Bairro/região desejada?");
+  if (!msg) {
+    return ctx.send("Envie o código do imóvel que deseja listar.");
   }
 
-  if (state.etapa === "list_regiao") {
-    state.dados.regiao = msg;
-    await updateSession(telefone, {
-      etapa: "list_preco",
-      dados: state.dados,
-    });
-    return sendText(telefone, "Preço máximo?");
+  if (msg.toLowerCase() === "menu") {
+    await updateSession(ctx.from, { etapa: "menu" });
+    return ctx.send("Retornando ao menu...");
   }
 
-  if (state.etapa === "list_preco") {
-    state.dados.preco = msg;
-    await updateSession(telefone, {
-      etapa: "list_quartos",
-      dados: state.dados,
-    });
-    return sendText(telefone, "Quantos quartos?");
-  }
-
-  if (state.etapa === "list_quartos") {
-    state.dados.quartos = msg;
-    await updateSession(telefone, {
-      etapa: "list_finalidade",
-      dados: state.dados,
-    });
-    return sendText(telefone, "Finalidade? (moradia/investimento)");
-  }
-
-  if (state.etapa === "list_finalidade") {
-    state.dados.finalidade = msg;
-
-    const resumo = await gerarResumoIA(
-      "listagem_imoveis",
-      state.dados,
-      telefone
-    );
-    await sendText(telefone, resumo);
-    await sendText(telefone, "Encaminhei ao corretor!");
-
-    await updateSession(telefone, { etapa: "aguardando_corretor", dados: {} });
-    return;
-  }
+  await ctx.send(`Listando informações do imóvel: ${msg}`);
 };
+
+export default listFlow;

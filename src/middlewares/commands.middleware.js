@@ -1,39 +1,25 @@
 import redis from "../services/redis.service.js";
 const { setAsync, delAsync, getAsync } = redis;
 
-export async function commandsMiddleware(ctx, next) {
-  const message = ctx?.message?.toLowerCase()?.trim() || "";
+const commandsMiddleware = async (ctx, next) => {
+  const body = ctx?.message?.toLowerCase()?.trim() || "";
   const phone = ctx.from;
 
-  // ----------------------------
-  // COMANDO /pausar
-  // ----------------------------
-  if (message === "/pausar") {
+  if (body === "/pausar") {
     await setAsync(`paused:${phone}`, true);
-    // NÃO ENVIAMOS NADA DE VOLTA
-    return;
+    return; // silencioso
   }
 
-  // ----------------------------
-  // COMANDO /voltar
-  // ----------------------------
-  if (message === "/voltar") {
+  if (body === "/voltar") {
     await delAsync(`paused:${phone}`);
     await ctx.send("🔄 Bot retomado.");
     return;
   }
 
-  // ----------------------------
-  // SE O BOT ESTÁ PAUSADO
-  // ----------------------------
-  const isPaused = await getAsync(`paused:${phone}`);
+  const paused = await getAsync(`paused:${phone}`);
+  if (paused) return;
 
-  if (isPaused) {
-    // SE ESTIVER PAUSADO, IGNORA TUDO
-    // Apenas deixa o cliente falar e o corretor responde pelo WhatsApp
-    return;
-  }
+  return next();
+};
 
-  // Continua para os outros middlewares
-  await next();
-}
+export default commandsMiddleware;

@@ -1,53 +1,39 @@
-const { sendText } = require("../services/zapi.service");
-const { updateSession } = require("../services/redis.service");
-const { showMainMenu } = require("../utils/menu.util");
+import { updateSession } from "../services/redis.service.js";
+import showMainMenu from "../utils/menu.util.js";
 
-module.exports = async function menuFlow(telefone, msg, state) {
-  const op = msg.trim();
+const menuFlow = async (ctx) => {
+  const msg = ctx.message?.trim();
 
-  switch (op) {
+  // MENU PRINCIPAL
+  await ctx.send(showMainMenu());
+
+  if (!msg) return;
+
+  switch (msg) {
     case "1":
-      await updateSession(telefone, { etapa: "compra_tipo", dados: {} });
-      return sendText(
-        telefone,
-        "Perfeito! Qual *tipo de imóvel* você deseja comprar?"
-      );
+      await updateSession(ctx.from, { etapa: "compra" });
+      return ctx.send("Ótimo! Vamos verificar imóveis para compra.");
 
     case "2":
-      await updateSession(telefone, { etapa: "alug_cliente_tipo", dados: {} });
-      return sendText(
-        telefone,
-        "Ótimo! Qual *tipo de imóvel* você deseja alugar?"
-      );
+      await updateSession(ctx.from, { etapa: "aluguel" });
+      return ctx.send("Perfeito! Vamos procurar imóveis para alugar.");
 
     case "4":
-      await updateSession(telefone, { etapa: "venda_tipo", dados: {} });
-      return sendText(
-        telefone,
-        "Certo! Qual *tipo de imóvel* você deseja vender?"
-      );
+      await updateSession(ctx.from, { etapa: "venda" });
+      return ctx.send("Vamos iniciar o processo de venda do seu imóvel.");
 
     case "5":
-      await updateSession(telefone, { etapa: "alug_prop_tipo", dados: {} });
-      return sendText(
-        telefone,
-        "Vamos anunciar seu imóvel para aluguel.\n\nQual o *tipo de imóvel*?"
-      );
+      await updateSession(ctx.from, { etapa: "lista" });
+      return ctx.send("Lista de imóveis do proprietário.");
 
     case "0":
-      await updateSession(telefone, {
-        etapa: "aguardando_corretor",
-        dados: {},
-      });
-      return sendText(
-        telefone,
-        "📞 Encaminhando para um corretor humano.\n\nEnvie:\n• Seu nome\n• Melhor horário\n• Assunto"
+      return ctx.send(
+        "Um corretor humano irá falar com você em instantes. Aguarde!"
       );
 
     default:
-      return sendText(
-        telefone,
-        "Opção inválida.\n\n" + showMainMenu()
-      );
+      return ctx.send("Opção inválida.\n\n" + showMainMenu());
   }
 };
+
+export default menuFlow;
