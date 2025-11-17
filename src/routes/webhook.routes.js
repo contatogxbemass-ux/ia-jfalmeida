@@ -1,115 +1,110 @@
 const express = require("express");
 const router = express.Router();
+
 const { getState, updateState } = require("../services/state.service");
 const { sendText } = require("../services/zapi.service");
-const gerarResumoIA = require("../services/openai.service");
 
+const menuFlow = require("../flows/menu.flow");
+const compraFlow = require("../flows/compra.flow");
+const aluguelFlow = require("../flows/aluguel.flow");
+const vendaFlow = require("../flows/venda.flow");
+
+// ======================================================
+// 🔥 WEBHOOK PRINCIPAL
+// ======================================================
 router.post("/", async (req, res) => {
+
   console.log("📩 RECEBIDO DO Z-API:", JSON.stringify(req.body, null, 2));
 
-  const raw = req.body;
-  const telefone = raw.phone || raw.connectedPhone;
+  const telefone = req.body.phone || req.body.connectedPhone;
+  const msg = req.body.text?.message?.trim() || null;
 
-  // Bloqueio total para grupos
-  if (raw.isGroup || telefone.includes("-group") || telefone.endsWith("@g.us")) {
+  if (!telefone || !msg) return res.sendStatus(200);
+
+  // Bloqueio de grupos
+  if (req.body.isGroup || telefone.includes("-group") || telefone.endsWith("@g.us")) {
+    console.log("⛔ Mensagem de grupo bloqueada");
     return res.sendStatus(200);
   }
 
-  const texto = raw?.text?.message || null;
-  const messageId = raw.messageId;
+  // Carrega estado do usuário
+  let state = getState(telefone);
 
-  if (!telefone || !texto) return res.sendStatus(200);
+  // Cria novo estado se não existir
+  if (!state) {
+    state = { etapa: "menu", dados: {}, lastMessageId: null };
+    updateState(telefone, state);
 
-  // Carregar estado
-  let estado = getState(telefone);
+    await sendText(
+      telefone,
+      "👋 *Bem-vindo(a) à JF Almeida Imóveis!*\n\n" +
+      "⿡ Comprar\n" +
+      "⿢ Alugar\n" +
+      "⿤ Vender\n" +
+      "⿠ Falar com corretor\n\n" +
+      "Digite *menu* a qualquer momento."
+    );
 
-  // Anti-duplicidade
-  if (estado.lastMessageId === messageId) {
     return res.sendStatus(200);
   }
-  updateState(telefone, { lastMessageId: messageId });
 
-  const msg = texto.trim();
+  // Anti duplicidade
+  const messageId = req.body.messageId;
+  if (state.lastMessageId === messageId) return res.sendStatus(200);
+  updateState(telefone, { ...state, lastMessageId: messageId });
+
   const msgLower = msg.toLowerCase();
 
-  // COMANDOS ADMINISTRATIVOS
-  if (msgLower === "/pausar") {
-    updateState(telefone, { silencio: true });
-    await sendText(telefone, "🤫 Atendimento automático pausado.");
-    return res.sendStatus(200);
-  }
-
-  if (msgLower === "/voltar") {
-    updateState(telefone, { silencio: false, etapa: "menu", dados: {} });
-    await sendText(telefone, "🔊 Atendimento automático reativado.");
-    await sendText(telefone, menuPrincipal());
-    return res.sendStatus(200);
-  }
-
-  if (estado.silencio) return res.sendStatus(200);
-
-  // RESET MANUAL
+  // Reset de menu
   if (msgLower === "menu") {
     updateState(telefone, { etapa: "menu", dados: {} });
-    await sendText(telefone, menuPrincipal());
+
+    await sendText(
+      telefone,
+      "👋 *Bem-vindo(a) à JF Almeida Imóveis!*\n\n" +
+      "⿡ Comprar\n" +
+      "⿢ Alugar\n" +
+      "⿤ Vender\n" +
+      "⿠ Falar com corretor\n\n" +
+      "Digite *menu* a qualquer momento."
+    );
+
     return res.sendStatus(200);
   }
 
-  // =============================
-  // MENU PRINCIPAL
-  // =============================
-  if (estado.etapa === "menu") {
-    switch (msg) {
-      case "1":
-        updateState(telefone, { etapa: "compra_tipo", dados: {} });
-        await sendText(telefone, "Ótimo! Qual *tipo de imóvel* você procura?");
-        return res.sendStatus(200);
-
-      case "2":
-        updateState(telefone, { etapa: "alug_cliente_tipo", dados: {} });
-        await sendText(telefone, "Perfeito! Qual *tipo de imóvel* você quer alugar?");
-        return res.sendStatus(200);
-
-      case "3":
-        updateState(telefone, { etapa: "list_tipo", dados: {} });
-        await sendText(telefone, "Certo! Qual *tipo de imóvel* você quer ver?");
-        return res.sendStatus(200);
-
-      case "4":
-        updateState(telefone, { etapa: "venda_tipo", dados: {} });
-        await sendText(telefone, "Ok! Qual *tipo de imóvel* você quer vender?");
-        return res.sendStatus(200);
-
-      case "5":
-        updateState(telefone, { etapa: "alug_prop_tipo", dados: {} });
-        await sendText(telefone, "Certo! Qual *tipo de imóvel* você quer colocar para aluguel?");
-        return res.sendStatus(200);
-
-      default:
-        await sendText(telefone, "Opção inválida. Digite uma opção do menu.\n\n" + menuPrincipal());
-        return res.sendStatus(200);
-    }
+  // MENU
+  if (state.etapa === "menu") {
+    await menuFlow(telefone, msg, state);
+    return res.sendStatus(200);
   }
+
+  // ======================================================
+  // 🔥 DIRECIONAMENTO PARA OS FLUXOS
+  // ======================================================
+
+  // COMPRA
+  if (state.etapa.startsWith("compra_")) {
+    await compraFlow(telefone, msg, state);
+    return res.sendStatus(200);
+  }
+
+  // ALUGUEL (cliente + proprietário)
+  if (state.etapa.startsWith("alug_")) {
+    await aluguelFlow(telefone, msg, state);
+    return res.sendStatus(200);
+  }
+
+  // VENDA
+  if (state.etapa.startsWith("venda_")) {
+    await vendaFlow(telefone, msg, state);
+    return res.sendStatus(200);
+  }
+
+  // FAIL SAFE
+  await sendText(telefone, "Não entendi. Digite *menu*.");
+  updateState(telefone, { etapa: "menu", dados: {} });
 
   return res.sendStatus(200);
 });
-
-// MENU
-function menuPrincipal() {
-  return `
-👋 *Bem-vindo(a) à JF Almeida Imóveis!*
-
-🏡 *IMÓVEIS*
-1️⃣ Comprar
-2️⃣ Alugar
-
-🏠 *PROPRIETÁRIO*
-3️⃣ Ver imóveis
-4️⃣ Vender imóvel
-5️⃣ Colocar imóvel para aluguel
-
-Digite *menu* a qualquer momento.
-`;
-}
 
 module.exports = router;
