@@ -1,6 +1,5 @@
-const Redis = require("ioredis");
+import Redis from "ioredis";
 
-// Conexão com Redis (Upstash / Render)
 const redis = new Redis(process.env.REDIS_URL, {
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
@@ -12,7 +11,7 @@ function sessionKey(phone) {
   return `session:${phone}`;
 }
 
-async function getSession(phone) {
+export async function getSession(phone) {
   if (!phone) throw new Error("Telefone é obrigatório na sessão");
 
   const key = sessionKey(phone);
@@ -48,7 +47,7 @@ async function getSession(phone) {
   }
 }
 
-async function updateSession(phone, data) {
+export async function updateSession(phone, data) {
   if (!phone) throw new Error("Telefone é obrigatório na sessão");
 
   const key = sessionKey(phone);
@@ -59,7 +58,7 @@ async function updateSession(phone, data) {
   return updated;
 }
 
-async function resetSession(phone) {
+export async function resetSession(phone) {
   if (!phone) throw new Error("Telefone é obrigatório na sessão");
 
   const key = sessionKey(phone);
@@ -75,9 +74,4 @@ async function resetSession(phone) {
   return initial;
 }
 
-module.exports = {
-  redis,
-  getSession,
-  updateSession,
-  resetSession,
-};
+export { redis };
