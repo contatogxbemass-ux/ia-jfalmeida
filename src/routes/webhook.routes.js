@@ -9,6 +9,9 @@ const compraFlow = require("../flows/compra.flow");
 const aluguelFlow = require("../flows/aluguel.flow");
 const vendaFlow = require("../flows/venda.flow");
 
+// IMPORTA O MENU BONITO
+const { menuPrincipal } = require("../utils/menu.util");
+
 // ======================================================
 // 🔥 WEBHOOK PRINCIPAL
 // ======================================================
@@ -35,16 +38,7 @@ router.post("/", async (req, res) => {
     state = { etapa: "menu", dados: {}, lastMessageId: null };
     updateState(telefone, state);
 
-    await sendText(
-      telefone,
-      "👋 *Bem-vindo(a) à JF Almeida Imóveis!*\n\n" +
-      "⿡ Comprar\n" +
-      "⿢ Alugar\n" +
-      "⿤ Vender\n" +
-      "⿠ Falar com corretor\n\n" +
-      "Digite *menu* a qualquer momento."
-    );
-
+    await sendText(telefone, menuPrincipal());
     return res.sendStatus(200);
   }
 
@@ -58,17 +52,7 @@ router.post("/", async (req, res) => {
   // Reset de menu
   if (msgLower === "menu") {
     updateState(telefone, { etapa: "menu", dados: {} });
-
-    await sendText(
-      telefone,
-      "👋 *Bem-vindo(a) à JF Almeida Imóveis!*\n\n" +
-      "⿡ Comprar\n" +
-      "⿢ Alugar\n" +
-      "⿤ Vender\n" +
-      "⿠ Falar com corretor\n\n" +
-      "Digite *menu* a qualquer momento."
-    );
-
+    await sendText(telefone, menuPrincipal());
     return res.sendStatus(200);
   }
 
