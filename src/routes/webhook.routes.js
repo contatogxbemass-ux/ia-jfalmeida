@@ -3,7 +3,6 @@ const router = express.Router();
 
 const { getState, updateState } = require("../services/state.service");
 const { sendText } = require("../services/zapi.service");
-const { sendButtons } = require("../services/buttons.service");
 
 const menuFlow = require("../flows/menu.flow");
 const compraFlow = require("../flows/compra.flow");
@@ -19,8 +18,7 @@ router.post("/", async (req, res) => {
 
   if (!telefone || !msg) return res.sendStatus(200);
 
-  if (req.body.isGroup === true || telefone.includes("-group") || telefone.endsWith("@g.us")) {
-    console.log("⛔ Mensagem de grupo bloqueada");
+  if (req.body.isGroup || telefone.includes("-group") || telefone.endsWith("@g.us")) {
     return res.sendStatus(200);
   }
 
@@ -30,11 +28,10 @@ router.post("/", async (req, res) => {
     state = { etapa: "menu", dados: {}, lastMessageId: null };
     updateState(telefone, state);
 
-    await sendButtons(telefone, "Menu principal:", [
-      { id: "1", text: "Comprar" },
-      { id: "2", text: "Alugar" },
-      { id: "3", text: "Vender" }
-    ]);
+    await sendText(
+      telefone,
+      "📍 *Menu Principal*\n\n🏘️ 1 — Comprar Imóvel\n🏡 2 — Alugar Imóvel\n💰 3 — Vender Imóvel"
+    );
 
     return res.sendStatus(200);
   }
@@ -49,11 +46,10 @@ router.post("/", async (req, res) => {
   if (msgLower === "menu") {
     updateState(telefone, { etapa: "menu", dados: {} });
 
-    await sendButtons(telefone, "Menu principal:", [
-      { id: "1", text: "Comprar" },
-      { id: "2", text: "Alugar" },
-      { id: "3", text: "Vender" }
-    ]);
+    await sendText(
+      telefone,
+      "📍 *Menu Principal*\n\n🏘️ 1 — Comprar Imóvel\n🏡 2 — Alugar Imóvel\n💰 3 — Vender Imóvel"
+    );
 
     return res.sendStatus(200);
   }
@@ -78,7 +74,7 @@ router.post("/", async (req, res) => {
     return res.sendStatus(200);
   }
 
-  await sendText(telefone, "Não entendi. Envie 'menu'.");
+  await sendText(telefone, "Não entendi. Envie *menu*.");
   return res.sendStatus(200);
 });
 

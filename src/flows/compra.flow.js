@@ -1,4 +1,4 @@
-const { sendMessage } = require("../services/zapi.service");
+const { sendText } = require("../services/zapi.service");
 const { updateState } = require("../services/state.service");
 const { iaResumo } = require("../services/openai.service");
 
@@ -9,38 +9,31 @@ module.exports = async function compraFlow(telefone, msg, state) {
         case "compra_tipo":
             state.dados.tipo = msg;
             updateState(telefone, { etapa: "compra_regiao", dados: state.dados });
-            return sendMessage(telefone, "Qual *região/bairro* você procura?");
-        
+            return sendText(telefone, "📍 Qual bairro/região deseja?");
+
         case "compra_regiao":
             state.dados.regiao = msg;
             updateState(telefone, { etapa: "compra_orcamento", dados: state.dados });
-            return sendMessage(telefone, "Qual seu *orçamento* máximo?");
-        
+            return sendText(telefone, "💵 Qual seu orçamento máximo?");
+
         case "compra_orcamento":
             state.dados.orcamento = msg;
-            updateState(telefone, { etapa: "compra_pagamento", dados: state.dados });
-            return sendMessage(telefone, "Forma de pagamento:", [
-                { id: "avista", title: "À vista" },
-                { id: "financiado", title: "Financiado" }
-            ]);
+            updateState(telefone, { etapa: "compra_forma", dados: state.dados });
+            return sendText(telefone, "💳 Qual a forma de pagamento? (ex: financiamento, à vista)");
 
-        case "compra_pagamento":
-            state.dados.pagamento = msg;
+        case "compra_forma":
+            state.dados.forma = msg;
             updateState(telefone, { etapa: "compra_urgencia", dados: state.dados });
-            return sendMessage(telefone, "Urgência:", [
-                { id: "alta", title: "Alta" },
-                { id: "media", title: "Média" },
-                { id: "baixa", title: "Baixa" }
-            ]);
+            return sendText(telefone, "⏱️ Qual o nível de urgência? (baixa, média, alta)");
 
         case "compra_urgencia":
             state.dados.urgencia = msg;
 
-            await sendMessage(telefone, "Gerando resumo da sua solicitação...");
+            await sendText(telefone, "Gerando resumo...");
             const resumo = await iaResumo("compra_imovel", state.dados, telefone);
-            await sendMessage(telefone, resumo);
 
-            await sendMessage(telefone, "Informações enviadas ao corretor da *JF Almeida*. Ele vai falar com você em breve.");
+            await sendText(telefone, resumo);
+            await sendText(telefone, "Informações enviadas para o corretor!");
 
             updateState(telefone, { etapa: "aguardando_corretor", dados: {} });
             return;
