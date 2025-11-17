@@ -1,26 +1,26 @@
-require("dotenv").config();
-const express = require("express");
-const cors = require("cors");
+// server.js
+
+import express from "express";
+import bodyParser from "body-parser";
+import { loggerMiddleware } from "./src/middlewares/logger.middleware.js";
+import { rateLimitMiddleware } from "./src/middlewares/rateLimit.middleware.js";
+import { commandsMiddleware } from "./src/middlewares/commands.middleware.js";
+import { pauseMiddleware } from "./src/middlewares/pause.middleware.js";
+import { routerMiddleware } from "./src/middlewares/router.middleware.js";
+import webhookRoutes from "./src/routes/webhook.routes.js";
+
 const app = express();
+app.use(bodyParser.json());
 
-// Configurações base
-app.use(cors());
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
-
-// Rotas
-const webhookRoutes = require("./src/routes/webhook.routes");
-
-// Saúde
-app.get("/", (req, res) => {
-  res.send("JF Almeida Bot — Online");
-});
+// ORDEM CERTA — NÃO MUDA!
+app.use(loggerMiddleware);
+app.use(rateLimitMiddleware);
+app.use(commandsMiddleware);
+app.use(pauseMiddleware);
+app.use(routerMiddleware);
 
 // Webhook
-app.use("/webhook", webhookRoutes);
+app.use("/", webhookRoutes);
 
-// Servidor
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log("🔥 Servidor rodando na porta " + PORT);
-});
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));

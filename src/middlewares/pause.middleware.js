@@ -3,21 +3,21 @@
 import { getAsync } from "../services/redis.service.js";
 
 export const pauseMiddleware = async (ctx, next) => {
-  const user = ctx.from;
-
   try {
-    // Verifica no Redis se o atendimento está pausado para este cliente
-    const isPaused = await getAsync(`pause:${user}`);
+    const phone = ctx.from;
 
-    // Se estiver pausado: o bot NÃO deve enviar nada, apenas silencia
-    if (isPaused === "true") {
-      return; // interrompe o fluxo silenciosamente
+    const paused = await getAsync(`pause:${phone}`);
+
+    // Se pausado → NÃO envia nada e NÃO chama next()
+    if (paused === "true") {
+      return; 
     }
 
-    // Se não estiver pausado, segue o fluxo normal
+    // Se não está pausado → segue fluxo normal
     return next();
+
   } catch (error) {
     console.error("Erro no pauseMiddleware:", error);
-    return next(); // fallback para não travar o bot
+    return next();
   }
 };

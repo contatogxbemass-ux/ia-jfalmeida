@@ -1,24 +1,36 @@
 // src/middlewares/router.middleware.js
 
-import { getAsync } from "../services/redis.service.js";
+import { menuFlow } from "../flows/menu.flow.js";
+import { compraFlow } from "../flows/compra.flow.js";
+import { aluguelFlow } from "../flows/aluguel.flow.js";
+import { vendaFlow } from "../flows/venda.flow.js";
+import { listFlow } from "../flows/list.flow.js";
 
 export const routerMiddleware = async (ctx, next) => {
-  try {
-    const user = ctx.from;
+  const state = ctx.state || {};
 
-    // Verifica se o usuário está pausado
-    const isPaused = await getAsync(`pause:${user}`);
+  // Se não tem etapa → vai para o menu automaticamente
+  if (!state.etapa) {
+    state.etapa = "menu";
+    await ctx.setState(state);
+  }
 
-    // SE ESTIVER PAUSADO → silêncio total, sem enviar NADA.
-    if (isPaused === "true") {
-      return; // não chama next(), não envia mensagem
-    }
+  const etapa = state.etapa;
 
-    // Se não estiver pausado, segue o fluxo normal
-    return next();
-
-  } catch (err) {
-    console.error("Erro no routerMiddleware:", err);
-    return next();
+  switch (etapa) {
+    case "menu":
+      return menuFlow(ctx, next);
+    case "compra":
+      return compraFlow(ctx, next);
+    case "aluguel":
+      return aluguelFlow(ctx, next);
+    case "venda":
+      return vendaFlow(ctx, next);
+    case "list":
+      return listFlow(ctx, next);
+    default:
+      state.etapa = "menu";
+      await ctx.setState(state);
+      return menuFlow(ctx, next);
   }
 };

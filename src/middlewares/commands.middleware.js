@@ -1,17 +1,25 @@
 // src/middlewares/commands.middleware.js
-const { showMainMenu } = require("../utils/menu.util");
 
-module.exports = async (ctx, next) => {
-  // Mensagem sempre tratada em minúsculo
-  const msg = ctx.body?.trim().toLowerCase() || "";
+import { setAsync, delAsync } from "../services/redis.service.js";
 
-  // Quando o usuário digita "menu" ou "/menu"
-  if (msg === "menu" || msg === "/menu") {
-    await ctx.setState({ etapa: "menu" });
-    await ctx.send(showMainMenu());
+export const commandsMiddleware = async (ctx, next) => {
+  const body = ctx.body?.trim().toLowerCase();
+  const phone = ctx.from;
+
+  // PAUSAR BOT
+  if (body === "/pausar") {
+    await setAsync(`pause:${phone}`, "true");
+    await ctx.send("⏸️ Bot pausado.");
     return;
   }
 
-  // Nenhum comando especial → segue o fluxo normal
+  // RETOMAR BOT
+  if (body === "/voltar") {
+    await delAsync(`pause:${phone}`);
+    await ctx.send("▶️ Bot retomado.");
+    return;
+  }
+
+  // Continua fluxo
   return next();
 };
