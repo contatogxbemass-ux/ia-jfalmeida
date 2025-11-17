@@ -7,8 +7,15 @@ const ZAPI_CLIENT_TOKEN = process.env.ZAPI_CLIENT_TOKEN;
 
 async function sendButtons(phone, title, buttons) {
   try {
+
+    // bloqueio absoluto de grupos
+    if (!phone || phone.includes("-group") || phone.endsWith("@g.us")) {
+      console.log("⛔ Tentativa de envio de botões para grupo bloqueada:", phone);
+      return;
+    }
+
     await axios.post(
-      `https://api.z-api.io/instances/${ZAPI_NUMBER}/token/${ZAPI_TOKEN}/send-buttons`,
+      `https://api.z-api.io/instances/${ZAPI_NUMBER}/token/${ZAPI_TOKEN}/send-button-message`,
       {
         phone,
         message: title,
@@ -20,8 +27,9 @@ async function sendButtons(phone, title, buttons) {
         }
       }
     );
+
   } catch (e) {
-    console.log("ERRO AO ENVIAR BOTÕES:", e.response?.data || e.message);
+    console.log("❌ ERRO AO ENVIAR BOTÕES:", e.response?.data || e.message);
   }
 }
 
